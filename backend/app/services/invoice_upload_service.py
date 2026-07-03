@@ -1,0 +1,516 @@
+import logging
+import time
+from uuid import UUID, uuid4
+
+from fastapi import BackgroundTasks, HTTPException, UploadFile
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
+from app.crud.invoices import get_invoice_by_file_id
+
+from app.crud.invoice_files import (
+    count_invoice_files_for_user,
+    create_invoice_file,
+    get_invoice_file,
+    get_invoice_file_for_user,
+    mark_invoice_uploaded,
+)
+from app.models.users import User
+from app.services.invoice_file_rules import (
+    get_invoice_content_type,
+    build_invoice_s3_key,
+    validate_invoice_s3_key,
+    validate_invoice_file_signature,
+    validate_uploaded_s3_metadata,
+)
+from app.services.s3_service import (
+    create_presigned_post,
+    get_s3_object_metadata,
+    get_s3_object_prefix_bytes,
+    get_max_file_size_bytes,
+    upload_s3_object_bytes,
+)
+from app.services.invoice_processor import process_invoice_from_s3
+
+
+logger = logging.getLogger(__name__)
+FREE_SCAN_LIMIT = 5
+
+
+def create_invoice_upload(
+    db: Session,
+    user: User,
+    original_filename: str,
+) -> dict:
+    """
+    Creates a DB record with status='waiting_upload'
+    and returns a presigned S3 POST URL.
+    """
+
+    try:
+        _enforce_scan_access(db=db, user=user)
+        invoice_file_id = uuid4()
+
+        content_type = get_invoice_content_type(
+            original_filename=original_filename,
+        )
+
+        s3_key = build_invoice_s3_key(
+            invoice_file_id=invoice_file_id,
+            original_filename=original_filename,
+        )
+
+        presigned_data = create_presigned_post(
+            s3_key=s3_key,
+            content_type=content_type,
+        )
+
+        create_invoice_file(
+            db=db,
+            invoice_file_id=invoice_file_id,
+            user_id=user.id,
+            original_filename=original_filename,
+            s3_key=s3_key,
+            content_type=content_type,
+        )
+
+        db.commit()
+
+        return {
+            "invoice_file_id": str(invoice_file_id),
+            "s3_key": s3_key,
+            "content_type": content_type,
+            "upload_url": presigned_data["upload_url"],
+            "fields": presigned_data["fields"],
+            "max_size_bytes": presigned_data["max_size_bytes"],
+            "expires_in_seconds": presigned_data["expires_in_seconds"],
+        }
+
+    except ValueError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="Invoice upload record already exists",
+        )
+
+    except HTTPException:
+        db.rollback()
+        raise
+
+    except Exception:
+        db.rollback()
+        logger.exception("Could not create invoice upload")
+        raise HTTPException(
+            status_code=500,
+            detail="Could not create invoice upload",
+        )
+
+
+async def upload_invoice_file(
+    db: Session,
+    background_tasks: BackgroundTasks,
+    user: User,
+    file: UploadFile,
+) -> dict:
+    """
+    Receives an invoice file through the API, stores it in S3,
+    marks it uploaded, and queues background invoice processing.
+    """
+
+    original_filename = file.filename or ""
+    upload_start = time.perf_counter()
+
+    try:
+        _enforce_scan_access(db=db, user=user)
+        invoice_file_id = uuid4()
+
+        content_type = get_invoice_content_type(
+            original_filename=original_filename,
+        )
+
+        phase_start = time.perf_counter()
+        content = await file.read()
+        logger.info(
+            "Read uploaded invoice request body in %.2fs: filename=%s size=%s bytes",
+            time.perf_counter() - phase_start,
+            original_filename,
+            len(content),
+        )
+
+        phase_start = time.perf_counter()
+        validate_uploaded_s3_metadata(
+            content_length=len(content),
+            content_type=content_type,
+            expected_content_type=content_type,
+            max_size_bytes=get_max_file_size_bytes(),
+        )
+        validate_invoice_file_signature(
+            content=content,
+            content_type=content_type,
+        )
+        logger.info(
+            "Validated uploaded invoice in %.2fs: filename=%s",
+            time.perf_counter() - phase_start,
+            original_filename,
+        )
+
+        s3_key = build_invoice_s3_key(
+            invoice_file_id=invoice_file_id,
+            original_filename=original_filename,
+        )
+
+        invoice_file = create_invoice_file(
+            db=db,
+            invoice_file_id=invoice_file_id,
+            user_id=user.id,
+            original_filename=original_filename,
+            s3_key=s3_key,
+            content_type=content_type,
+        )
+
+        phase_start = time.perf_counter()
+        upload_s3_object_bytes(
+            s3_key=s3_key,
+            content=content,
+            content_type=content_type,
+        )
+        logger.info(
+            "Uploaded invoice to S3 in %.2fs: s3_key=%s size=%s bytes",
+            time.perf_counter() - phase_start,
+            s3_key,
+            len(content),
+        )
+
+        mark_invoice_uploaded(
+            invoice_file=invoice_file,
+            size_bytes=len(content),
+            content_type=content_type,
+        )
+
+        db.commit()
+        logger.info(
+            "Invoice upload API completed in %.2fs: invoice_file_id=%s",
+            time.perf_counter() - upload_start,
+            invoice_file_id,
+        )
+
+    except ValueError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="Invoice upload record already exists",
+        )
+
+    except HTTPException:
+        db.rollback()
+        raise
+
+    except Exception:
+        db.rollback()
+        logger.exception("Could not upload invoice file")
+        raise HTTPException(
+            status_code=500,
+            detail="Could not upload invoice file",
+        )
+
+    background_tasks.add_task(
+        process_invoice_from_s3,
+        invoice_file_id=str(invoice_file.id),
+        s3_key=invoice_file.s3_key,
+    )
+
+    return {
+        "message": "File uploaded. Invoice processing queued.",
+        "invoice_file_id": str(invoice_file.id),
+        "s3_key": invoice_file.s3_key,
+        "status": "processing_queued",
+    }
+
+
+def complete_invoice_upload(
+    db: Session,
+    background_tasks: BackgroundTasks,
+    user_id: int,
+    invoice_file_id: str,
+    s3_key: str,
+) -> dict:
+    """
+    Called after frontend/mobile uploads directly to S3.
+
+    It:
+    1. Checks DB record exists
+    2. Checks S3 key matches DB record
+    3. Checks object exists in S3
+    4. Validates size/content type
+    5. Marks DB record as uploaded
+    6. Queues background invoice processing
+    """
+
+    invoice_uuid = _parse_invoice_uuid(invoice_file_id)
+
+    invoice_file = get_invoice_file_for_user(
+        db=db,
+        invoice_file_id=invoice_uuid,
+        user_id=user_id,
+    )
+
+    if invoice_file is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Invoice file record not found",
+        )
+
+    if invoice_file.s3_key != s3_key:
+        raise HTTPException(
+            status_code=400,
+            detail="S3 key does not match this invoice file",
+        )
+
+    try:
+        validate_invoice_s3_key(s3_key)
+
+        metadata = get_s3_object_metadata(s3_key=s3_key)
+
+        if metadata is None:
+            raise ValueError("File was not uploaded to S3")
+
+        content_length = metadata["content_length"]
+        content_type = metadata["content_type"]
+
+        validate_uploaded_s3_metadata(
+            content_length=content_length,
+            content_type=content_type,
+            expected_content_type=invoice_file.content_type,
+            max_size_bytes=get_max_file_size_bytes(),
+        )
+        validate_invoice_file_signature(
+            content=get_s3_object_prefix_bytes(s3_key=s3_key),
+            content_type=content_type,
+        )
+
+        mark_invoice_uploaded(
+            invoice_file=invoice_file,
+            size_bytes=content_length,
+            content_type=content_type,
+        )
+
+        db.commit()
+
+    except ValueError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
+    except Exception:
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail="Could not complete invoice upload",
+        )
+
+    background_tasks.add_task(
+        process_invoice_from_s3,
+        invoice_file_id=str(invoice_file.id),
+        s3_key=invoice_file.s3_key,
+    )
+
+    return {
+        "message": "Upload completed. Invoice processing queued.",
+        "invoice_file_id": str(invoice_file.id),
+        "s3_key": invoice_file.s3_key,
+        "status": "processing_queued",
+    }
+
+
+def get_invoice_upload_status(
+    db: Session,
+    user_id: int,
+    invoice_file_id: str,
+) -> dict:
+    invoice_uuid = _parse_invoice_uuid(invoice_file_id)
+
+    invoice_file = get_invoice_file_for_user(
+        db=db,
+        invoice_file_id=invoice_uuid,
+        user_id=user_id,
+    )
+
+    if invoice_file is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Invoice file not found",
+        )
+
+    return {
+        "invoice_file_id": str(invoice_file.id),
+        "original_filename": invoice_file.original_filename,
+        "s3_key": invoice_file.s3_key,
+        "content_type": invoice_file.content_type,
+        "size_bytes": invoice_file.size_bytes,
+        "status": invoice_file.status,
+        "error_message": invoice_file.error_message,
+    }
+
+
+def retry_invoice_processing(
+    db: Session,
+    background_tasks: BackgroundTasks,
+    user_id: int,
+    invoice_file_id: str,
+) -> dict:
+    invoice_uuid = _parse_invoice_uuid(invoice_file_id)
+
+    invoice_file = get_invoice_file_for_user(
+        db=db,
+        invoice_file_id=invoice_uuid,
+        user_id=user_id,
+    )
+
+    if invoice_file is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Invoice file not found",
+        )
+
+    if invoice_file.status == "waiting_upload":
+        raise HTTPException(
+            status_code=400,
+            detail="Invoice file was not uploaded yet",
+        )
+
+    invoice_file.status = "uploaded"
+    invoice_file.error_message = None
+    invoice_file.processed_at = None
+    db.commit()
+
+    background_tasks.add_task(
+        process_invoice_from_s3,
+        invoice_file_id=str(invoice_file.id),
+        s3_key=invoice_file.s3_key,
+    )
+
+    return {
+        "message": "Invoice processing retried.",
+        "invoice_file_id": str(invoice_file.id),
+        "s3_key": invoice_file.s3_key,
+        "status": "processing_queued",
+    }
+
+
+def _parse_invoice_uuid(invoice_file_id: str) -> UUID:
+    try:
+        return UUID(invoice_file_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid invoice_file_id",
+        )
+
+
+def _enforce_scan_access(
+    db: Session,
+    user: User,
+) -> None:
+    if user.is_pro:
+        return
+
+    scan_count = count_invoice_files_for_user(db=db, user_id=user.id)
+    if scan_count >= FREE_SCAN_LIMIT:
+        raise HTTPException(
+            status_code=403,
+            detail="Free scan limit reached. Register, subscribe to Pro, and log in to continue.",
+        )
+
+
+def get_invoice_usage(
+    db: Session,
+    user: User,
+) -> dict:
+    used_scans = count_invoice_files_for_user(db=db, user_id=user.id)
+    return {
+        "used_scans": used_scans,
+        "free_scan_limit": FREE_SCAN_LIMIT,
+        "remaining_free_scans": max(FREE_SCAN_LIMIT - used_scans, 0),
+        "is_pro": user.is_pro,
+    }
+    
+
+def get_invoice_result(
+    db: Session,
+    user_id: int,
+    invoice_file_id: str,
+) -> dict:
+    invoice_uuid = _parse_invoice_uuid(invoice_file_id)
+
+    invoice_file = get_invoice_file_for_user(
+        db=db,
+        invoice_file_id=invoice_uuid,
+        user_id=user_id,
+    )
+
+    if invoice_file is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Invoice file not found",
+        )
+
+    if invoice_file.status == "failed":
+        return {
+            "invoice_file_id": str(invoice_file.id),
+            "status": invoice_file.status,
+            "invoice": None,
+            "error_message": invoice_file.error_message,
+        }
+
+    if invoice_file.status != "processed":
+        return {
+            "invoice_file_id": str(invoice_file.id),
+            "status": invoice_file.status,
+            "invoice": None,
+            "error_message": None,
+        }
+
+    invoice = get_invoice_by_file_id(
+        db=db,
+        invoice_file_id=invoice_uuid,
+        user_id=user_id,
+    )
+
+    if invoice is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Processed invoice data not found",
+        )
+
+    return {
+        "invoice_file_id": str(invoice_file.id),
+        "status": invoice_file.status,
+        "error_message": None,
+        "invoice": {
+            "id": str(invoice.id),
+            "invoice_file_id": str(invoice.invoice_file_id),
+            "supplier_name": invoice.supplier_name,
+            "invoice_number": invoice.invoice_number,
+            "invoice_date": invoice.invoice_date.isoformat() if invoice.invoice_date else None,
+            "currency": invoice.currency,
+            "subtotal": str(invoice.subtotal) if invoice.subtotal is not None else None,
+            "tax_amount": str(invoice.tax_amount) if invoice.tax_amount is not None else None,
+            "total_amount": str(invoice.total_amount) if invoice.total_amount is not None else None,
+            "items": [
+                {
+                    "item_name": item.item_name,
+                    "quantity": str(item.quantity) if item.quantity is not None else None,
+                    "unit_price": str(item.unit_price) if item.unit_price is not None else None,
+                    "total_price": str(item.total_price) if item.total_price is not None else None,
+                    "category": item.category,
+                }
+                for item in invoice.items
+            ],
+        },
+    }

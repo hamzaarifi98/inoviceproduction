@@ -1,0 +1,26 @@
+{
+  "expo": {
+    "name": "Invoice Pocket",
+    "slug": "invoice-pocket",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "Invoice Pocket uses the camera to scan invoice photos.",
+        "NSPhotoLibraryUsageDescription": "Invoice Pocket lets you choose invoice photos from your library."
+      }
+    },
+    "android": {
+      "package": "com.invoicepocket.mobile",
+      "permissions": [
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE"
+      ]
+    }
+  }
+}

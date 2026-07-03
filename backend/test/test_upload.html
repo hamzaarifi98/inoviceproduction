@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+<body>
+  <h2>Invoice Upload Test</h2>
+
+  <input type="file" id="fileInput" />
+  <button onclick="uploadInvoice()">Upload</button>
+
+  <pre id="output"></pre>
+
+  <script>
+    async function uploadInvoice() {
+      const file = document.getElementById("fileInput").files[0];
+      const output = document.getElementById("output");
+
+      if (!file) {
+        output.textContent = "Choose a file first";
+        return;
+      }
+
+      // 1. Ask FastAPI for presigned upload URL
+      const presignResponse = await fetch("http://127.0.0.1:8000/invoices/upload-url", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          original_filename: file.name
+        })
+      });
+
+      const presignData = await presignResponse.json();
+
+      if (!presignResponse.ok) {
+        output.textContent = JSON.stringify(presignData, null, 2);
+        return;
+      }
+
+      // 2. Upload directly to S3
+      const formData = new FormData();
+
+      Object.entries(presignData.fields).forEach(([key, value]) => {
+        formData.append(key, value);
+      });
+
+      formData.append("file", file);
+
+      const s3Response = await fetch(presignData.upload_url, {
+        method: "POST",
+        body: formData
+      });
+
+      if (!s3Response.ok) {
+        output.textContent = "S3 upload failed";
+        return;
+      }
+
+      // 3. Tell FastAPI upload is completed
+      const completeResponse = await fetch("http://127.0.0.1:8000/invoices/complete-upload", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          invoice_file_id: presignData.invoice_file_id,
+          s3_key: presignData.s3_key,
+          original_filename: file.name
+        })
+      });
+
+      const completeData = await completeResponse.json();
+
+      output.textContent = JSON.stringify(completeData, null, 2);
+    }
+  </script>
+</body>
+</html>

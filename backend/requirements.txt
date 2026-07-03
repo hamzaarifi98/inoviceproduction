@@ -1,0 +1,15 @@
+fastAPI
+uvicorn
+sqlalchemy
+pydantic
+psycopg2-binary
+python-dotenv
+python-multipart
+paddleocr[all]
+paddlepaddle
+google-cloud-vision
+openai
+alembic
+neo4j
+boto3
+Pillow
