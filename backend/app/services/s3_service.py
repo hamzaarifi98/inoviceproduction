@@ -10,7 +10,22 @@ from app.config.settings import settings
 
 @lru_cache
 def get_s3_client():
-    return boto3.client(
+    session_kwargs = {}
+    if settings.AWS_ACCESS_KEY_ID and settings.AWS_SECRET_ACCESS_KEY:
+        session_kwargs = {
+            "aws_access_key_id": settings.AWS_ACCESS_KEY_ID,
+            "aws_secret_access_key": settings.AWS_SECRET_ACCESS_KEY,
+            "aws_session_token": settings.AWS_SESSION_TOKEN,
+        }
+
+    session = boto3.Session(**session_kwargs)
+    if session.get_credentials() is None:
+        raise RuntimeError(
+            "AWS credentials are missing. Set AWS_ACCESS_KEY_ID and "
+            "AWS_SECRET_ACCESS_KEY in the backend environment."
+        )
+
+    return session.client(
         "s3",
         region_name=settings.AWS_REGION,
         endpoint_url=f"https://s3.{settings.AWS_REGION}.amazonaws.com",
