@@ -1,6 +1,7 @@
 fastAPI
 sqlalchemy
 pydantic
+pydantic-settings>=2.0.0
 psycopg2-binary
 python-dotenv
 python-multipart
