@@ -1,5 +1,4 @@
 fastAPI
-uvicorn
 sqlalchemy
 pydantic
 psycopg2-binary
@@ -9,6 +8,8 @@ google-cloud-vision
 openai
 alembic
 gunicorn
+uvicorn[standard]
+uvicorn-worker
 neo4j
 boto3
 Pillow
