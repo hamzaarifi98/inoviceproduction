@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { File, Paths } from "expo-file-system";
+import * as Sharing from "expo-sharing";
 import { Alert, Share, Text, View } from "react-native";
 
 import { invoiceToCsvRows, pollForResult } from "../api/invoices";
@@ -22,10 +24,30 @@ export function HistoryScreen({ app, t }) {
       return;
     }
 
-    await Share.share({
-      title: t("exportInvoices"),
-      message: invoiceToCsvRows(processed),
-    });
+    const csv = invoiceToCsvRows(processed);
+    const file = new File(Paths.cache, `invoice-pocket-${new Date().toISOString().replace(/[:.]/g, "-")}.csv`);
+
+    try {
+      file.create({ overwrite: true });
+      file.write(`\uFEFF${csv}`, { encoding: "utf8" });
+
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(file.uri, {
+          dialogTitle: t("exportInvoices"),
+          mimeType: "text/csv",
+          UTI: "public.comma-separated-values-text",
+        });
+        return;
+      }
+
+      await Share.share({
+        title: t("exportInvoices"),
+        message: csv,
+        url: file.uri,
+      });
+    } catch (caught) {
+      Alert.alert(t("exportInvoices"), caught.message);
+    }
   }
 
   async function retryInvoice(record) {

@@ -1,6 +1,6 @@
 import { StatusBar } from "expo-status-bar";
 import { useState } from "react";
-import { KeyboardAvoidingView, Platform, Pressable, SafeAreaView, Text, TextInput, View } from "react-native";
+import { Image, KeyboardAvoidingView, Platform, Pressable, SafeAreaView, Text, TextInput, View } from "react-native";
 
 import { PrimaryButton } from "../components/Card";
 import { languages, translate } from "../i18n";
@@ -11,7 +11,6 @@ export function LoginScreen({ app, onAuthenticated }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [verificationPin, setVerificationPin] = useState("");
-  const [apiUrl, setApiUrl] = useState(app.apiUrl);
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const t = (key, params) => translate(app.language, key, params);
@@ -31,11 +30,12 @@ export function LoginScreen({ app, onAuthenticated }) {
     setError("");
 
     try {
-      await app.updateApiUrl(apiUrl);
       if (mode === "register") {
         await app.request("/auth/register", {
           method: "POST",
           body: JSON.stringify({ email, password }),
+          timeoutMs: 45000,
+          timeoutMessage: "Registration took too long. The server may still be waking up; please try again.",
         });
         setMode("verify");
         setError(t("verificationPinSent"));
@@ -45,6 +45,8 @@ export function LoginScreen({ app, onAuthenticated }) {
       const session = await app.request(mode === "verify" ? "/auth/verify-email" : "/auth/login", {
         method: "POST",
         body: JSON.stringify(mode === "verify" ? { email, pin: verificationPin } : { email, password }),
+        timeoutMs: 45000,
+        timeoutMessage: "Login took too long. The server may still be waking up; please try again.",
       });
 
       await app.saveSession({
@@ -64,7 +66,7 @@ export function LoginScreen({ app, onAuthenticated }) {
       <StatusBar style="dark" />
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.authPanel}>
         <View style={styles.brandMark}>
-          <Text style={styles.brandText}>IP</Text>
+          <Image source={require("../../assets/icon.png")} style={styles.brandImage} />
         </View>
         <View style={styles.authTitleRow}>
           <View style={styles.authTitleText}>
@@ -84,11 +86,6 @@ export function LoginScreen({ app, onAuthenticated }) {
               </Pressable>
             ))}
           </View>
-        </View>
-
-        <View style={styles.field}>
-          <Text style={styles.label}>{t("apiServer")}</Text>
-          <TextInput value={apiUrl} onChangeText={setApiUrl} autoCapitalize="none" style={styles.input} />
         </View>
 
         <View style={styles.field}>

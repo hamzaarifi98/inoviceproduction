@@ -10,7 +10,7 @@ from app.models.invoice_item import InvoiceItem
 
 from app.core.security import get_current_user
 from app.models.users import User
-from app.schemas.invoice_result import InvoiceFileResultResponse
+from app.schemas.invoice_result import InvoiceFileResultResponse, InvoiceHistoryRecordResponse
 from app.core.database import get_db
 from app.schemas.invoice_upload import (
     CreateUploadUrlRequest,
@@ -26,6 +26,7 @@ from app.services.invoice_upload_service import (
     upload_invoice_file,
     get_invoice_upload_status,
     get_invoice_result,
+    get_invoice_history,
     get_invoice_usage,
     retry_invoice_processing,
 )
@@ -168,6 +169,20 @@ def get_upload_usage(
     return get_invoice_usage(
         db=db,
         user=current_user,
+    )
+
+
+@router.get(
+    "/history",
+    response_model=list[InvoiceHistoryRecordResponse],
+)
+def get_upload_history(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return get_invoice_history(
+        db=db,
+        user_id=current_user.id,
     )
 
 

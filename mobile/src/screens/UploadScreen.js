@@ -146,6 +146,7 @@ export function UploadScreen({ app, t, onRequireAccount }) {
           s3_key: presignData.s3_key,
         }),
         timeoutMs: 120000,
+        timeoutMessage: "Upload took too long. Please try again with a smaller file or better connection.",
       });
       console.log(`[upload] Direct S3 upload flow took ${((Date.now() - uploadStart) / 1000).toFixed(2)}s`);
 

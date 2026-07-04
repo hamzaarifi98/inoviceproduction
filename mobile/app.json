@@ -4,12 +4,14 @@
     "slug": "invoice-pocket",
     "version": "1.0.0",
     "orientation": "portrait",
+    "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "assetBundlePatterns": [
       "**/*"
     ],
     "ios": {
       "supportsTablet": true,
+      "icon": "./assets/icon.png",
       "infoPlist": {
         "NSCameraUsageDescription": "Invoice Pocket uses the camera to scan invoice photos.",
         "NSPhotoLibraryUsageDescription": "Invoice Pocket lets you choose invoice photos from your library."
@@ -20,7 +22,24 @@
       "permissions": [
         "CAMERA",
         "READ_EXTERNAL_STORAGE"
-      ]
+      ],
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#073f35"
+      }
+    },
+    "splash": {
+      "image": "./assets/icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#073f35"
+    },
+    "web": {
+      "favicon": "./assets/icon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "574e27d8-0a9e-4731-b50d-82652d324559"
+      }
     }
   }
 }

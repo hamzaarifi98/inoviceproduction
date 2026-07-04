@@ -27,3 +27,13 @@ class InvoiceFileResultResponse(BaseModel):
     status: str
     invoice: InvoiceResult | None = None
     error_message: str | None = None
+
+
+class InvoiceHistoryRecordResponse(BaseModel):
+    invoice_file_id: str
+    original_filename: str
+    status: str
+    error_message: str | None = None
+    createdAt: str
+    updatedAt: str | None = None
+    invoice: InvoiceResult | None = None

@@ -61,6 +61,18 @@ def count_invoice_files_for_user(
     return db.query(InvoiceFile).filter(InvoiceFile.user_id == user_id).count()
 
 
+def list_invoice_files_for_user(
+    db: Session,
+    user_id: int,
+) -> list[InvoiceFile]:
+    return (
+        db.query(InvoiceFile)
+        .filter(InvoiceFile.user_id == user_id)
+        .order_by(InvoiceFile.created_at.desc())
+        .all()
+    )
+
+
 def mark_invoice_uploaded(
     invoice_file: InvoiceFile,
     size_bytes: int,

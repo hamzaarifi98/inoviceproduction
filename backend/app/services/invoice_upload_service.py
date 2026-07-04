@@ -4,7 +4,7 @@ from uuid import UUID, uuid4
 
 from fastapi import BackgroundTasks, HTTPException, UploadFile
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 from app.crud.invoices import get_invoice_by_file_id
 
 from app.crud.invoice_files import (
@@ -12,8 +12,10 @@ from app.crud.invoice_files import (
     create_invoice_file,
     get_invoice_file,
     get_invoice_file_for_user,
+    list_invoice_files_for_user,
     mark_invoice_uploaded,
 )
+from app.models.invoice import Invoice
 from app.models.users import User
 from app.services.invoice_file_rules import (
     get_invoice_content_type,
@@ -441,6 +443,36 @@ def get_invoice_usage(
     }
     
 
+def get_invoice_history(
+    db: Session,
+    user_id: int,
+) -> list[dict]:
+    invoice_files = list_invoice_files_for_user(db=db, user_id=user_id)
+
+    if not invoice_files:
+        return []
+
+    invoice_file_ids = [invoice_file.id for invoice_file in invoice_files]
+    invoices = (
+        db.query(Invoice)
+        .options(selectinload(Invoice.items))
+        .filter(
+            Invoice.user_id == user_id,
+            Invoice.invoice_file_id.in_(invoice_file_ids),
+        )
+        .all()
+    )
+    invoices_by_file_id = {invoice.invoice_file_id: invoice for invoice in invoices}
+
+    return [
+        _invoice_file_history_payload(
+            invoice_file=invoice_file,
+            invoice=invoices_by_file_id.get(invoice_file.id),
+        )
+        for invoice_file in invoice_files
+    ]
+
+
 def get_invoice_result(
     db: Session,
     user_id: int,
@@ -492,25 +524,51 @@ def get_invoice_result(
         "invoice_file_id": str(invoice_file.id),
         "status": invoice_file.status,
         "error_message": None,
-        "invoice": {
-            "id": str(invoice.id),
-            "invoice_file_id": str(invoice.invoice_file_id),
-            "supplier_name": invoice.supplier_name,
-            "invoice_number": invoice.invoice_number,
-            "invoice_date": invoice.invoice_date.isoformat() if invoice.invoice_date else None,
-            "currency": invoice.currency,
-            "subtotal": str(invoice.subtotal) if invoice.subtotal is not None else None,
-            "tax_amount": str(invoice.tax_amount) if invoice.tax_amount is not None else None,
-            "total_amount": str(invoice.total_amount) if invoice.total_amount is not None else None,
-            "items": [
-                {
-                    "item_name": item.item_name,
-                    "quantity": str(item.quantity) if item.quantity is not None else None,
-                    "unit_price": str(item.unit_price) if item.unit_price is not None else None,
-                    "total_price": str(item.total_price) if item.total_price is not None else None,
-                    "category": item.category,
-                }
-                for item in invoice.items
-            ],
-        },
+        "invoice": _invoice_payload(invoice),
+    }
+
+
+def _invoice_file_history_payload(
+    invoice_file,
+    invoice: Invoice | None,
+) -> dict:
+    updated_at = (
+        invoice_file.processed_at
+        or invoice_file.uploaded_at
+        or invoice_file.processing_started_at
+        or invoice_file.created_at
+    )
+
+    return {
+        "invoice_file_id": str(invoice_file.id),
+        "original_filename": invoice_file.original_filename,
+        "status": invoice_file.status,
+        "error_message": invoice_file.error_message,
+        "createdAt": invoice_file.created_at.isoformat(),
+        "updatedAt": updated_at.isoformat() if updated_at else None,
+        "invoice": _invoice_payload(invoice) if invoice else None,
+    }
+
+
+def _invoice_payload(invoice: Invoice) -> dict:
+    return {
+        "id": str(invoice.id),
+        "invoice_file_id": str(invoice.invoice_file_id),
+        "supplier_name": invoice.supplier_name,
+        "invoice_number": invoice.invoice_number,
+        "invoice_date": invoice.invoice_date.isoformat() if invoice.invoice_date else None,
+        "currency": invoice.currency,
+        "subtotal": str(invoice.subtotal) if invoice.subtotal is not None else None,
+        "tax_amount": str(invoice.tax_amount) if invoice.tax_amount is not None else None,
+        "total_amount": str(invoice.total_amount) if invoice.total_amount is not None else None,
+        "items": [
+            {
+                "item_name": item.item_name,
+                "quantity": str(item.quantity) if item.quantity is not None else None,
+                "unit_price": str(item.unit_price) if item.unit_price is not None else None,
+                "total_price": str(item.total_price) if item.total_price is not None else None,
+                "category": item.category,
+            }
+            for item in invoice.items
+        ],
     }

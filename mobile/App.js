@@ -28,13 +28,13 @@ export default function App() {
   }
 
   async function logout() {
-    setRoute("dashboard");
     await app.logout();
+    setRoute("login");
   }
 
   return (
     <SafeAreaView style={styles.app}>
-      <StatusBar style="dark" />
+      <StatusBar style="light" />
       <View style={styles.phoneShell}>
         <Header
           title={t(routeLabels[route] || routeLabels.dashboard)}
