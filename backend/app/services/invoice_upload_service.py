@@ -1,5 +1,6 @@
 import logging
 import time
+from decimal import Decimal
 from uuid import UUID, uuid4
 
 from fastapi import BackgroundTasks, HTTPException, UploadFile
@@ -671,7 +672,7 @@ def _invoice_payload(invoice: Invoice) -> dict:
         "currency": invoice.currency,
         "subtotal": str(invoice.subtotal) if invoice.subtotal is not None else None,
         "tax_amount": str(invoice.tax_amount) if invoice.tax_amount is not None else None,
-        "total_amount": str(invoice.total_amount) if invoice.total_amount is not None else None,
+        "total_amount": str(_invoice_total_amount(invoice)),
         "items": [
             {
                 "item_name": item.item_name,
@@ -683,6 +684,24 @@ def _invoice_payload(invoice: Invoice) -> dict:
             for item in invoice.items
         ],
     }
+
+
+def _invoice_total_amount(invoice: Invoice) -> Decimal:
+    if invoice.total_amount is not None and invoice.total_amount > 0:
+        return invoice.total_amount
+
+    return sum((_invoice_item_amount(item) for item in invoice.items), Decimal("0"))
+
+
+def _invoice_item_amount(item) -> Decimal:
+    if item.total_price is not None and item.total_price > 0:
+        return item.total_price
+
+    if item.unit_price is not None and item.unit_price > 0:
+        quantity = item.quantity if item.quantity is not None and item.quantity > 0 else Decimal("1")
+        return item.unit_price * quantity
+
+    return Decimal("0")
 
 
 def _pipeline_log_payload(log) -> dict:
