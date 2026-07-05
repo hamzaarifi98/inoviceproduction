@@ -57,6 +57,24 @@ def set_email_verification_pin(
     user.email_verification_expires_at = expires_at
 
 
+def set_password_reset_pin(
+    user: User,
+    pin_hash: str,
+    expires_at: datetime,
+) -> None:
+    user.password_reset_pin_hash = pin_hash
+    user.password_reset_expires_at = expires_at
+
+
+def set_password_hash(
+    user: User,
+    password_hash: str,
+) -> None:
+    user.password_hash = password_hash
+    user.password_reset_pin_hash = None
+    user.password_reset_expires_at = None
+
+
 def mark_email_verified(user: User) -> None:
     user.is_email_verified = True
     user.email_verification_pin_hash = None

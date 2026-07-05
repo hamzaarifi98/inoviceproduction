@@ -32,6 +32,15 @@ export default function App() {
     setRoute("login");
   }
 
+  if (route === "login") {
+    return (
+      <LoginScreen
+        app={app}
+        onAuthenticated={() => setRoute("dashboard")}
+      />
+    );
+  }
+
   return (
     <SafeAreaView style={styles.app}>
       <StatusBar style="light" />
@@ -46,7 +55,6 @@ export default function App() {
         />
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           {route === "dashboard" && <DashboardScreen app={app} t={t} />}
-          {route === "login" && <LoginScreen app={app} onAuthenticated={() => setRoute("dashboard")} />}
           {route === "upload" && <UploadScreen app={app} t={t} onRequireAccount={() => setRoute("login")} />}
           {route === "categories" && <CategoriesScreen invoices={app.invoices} t={t} />}
           {route === "history" && <HistoryScreen app={app} t={t} />}

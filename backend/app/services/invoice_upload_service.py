@@ -15,6 +15,7 @@ from app.crud.invoice_files import (
     list_invoice_files_for_user,
     mark_invoice_uploaded,
 )
+from app.crud.invoice_processing_logs import list_invoice_processing_logs_for_user
 from app.models.invoice import Invoice
 from app.models.users import User
 from app.services.invoice_file_rules import (
@@ -32,6 +33,7 @@ from app.services.s3_service import (
     upload_s3_object_bytes,
 )
 from app.services.invoice_processor import process_invoice_from_s3
+from app.services.pipeline_logger import log_pipeline_event
 
 
 logger = logging.getLogger(__name__)
@@ -66,13 +68,27 @@ def create_invoice_upload(
             content_type=content_type,
         )
 
-        create_invoice_file(
+        invoice_file = create_invoice_file(
             db=db,
             invoice_file_id=invoice_file_id,
             user_id=user.id,
             original_filename=original_filename,
             s3_key=s3_key,
             content_type=content_type,
+        )
+        log_pipeline_event(
+            db=db,
+            invoice_file_id=invoice_file.id,
+            stage="upload_url.created",
+            status="success",
+            message="Presigned upload URL created",
+            metadata={
+                "original_filename": original_filename,
+                "content_type": content_type,
+                "s3_key": s3_key,
+                "max_size_bytes": presigned_data["max_size_bytes"],
+                "expires_in_seconds": presigned_data["expires_in_seconds"],
+            },
         )
 
         db.commit()
@@ -172,6 +188,18 @@ async def upload_invoice_file(
             s3_key=s3_key,
             content_type=content_type,
         )
+        log_pipeline_event(
+            db=db,
+            invoice_file_id=invoice_file.id,
+            stage="upload.direct_received",
+            status="success",
+            message="Invoice file received by API",
+            metadata={
+                "original_filename": original_filename,
+                "content_type": content_type,
+                "size_bytes": len(content),
+            },
+        )
 
         phase_start = time.perf_counter()
         upload_s3_object_bytes(
@@ -185,11 +213,31 @@ async def upload_invoice_file(
             s3_key,
             len(content),
         )
+        log_pipeline_event(
+            db=db,
+            invoice_file_id=invoice_file.id,
+            stage="storage.uploaded",
+            status="success",
+            message="Invoice uploaded to S3",
+            duration_ms=_elapsed_ms(phase_start),
+            metadata={
+                "s3_key": s3_key,
+                "size_bytes": len(content),
+                "content_type": content_type,
+            },
+        )
 
         mark_invoice_uploaded(
             invoice_file=invoice_file,
             size_bytes=len(content),
             content_type=content_type,
+        )
+        log_pipeline_event(
+            db=db,
+            invoice_file_id=invoice_file.id,
+            stage="processing.queued",
+            status="success",
+            message="Invoice processing queued",
         )
 
         db.commit()
@@ -275,7 +323,18 @@ def complete_invoice_upload(
             detail="S3 key does not match this invoice file",
         )
 
+    complete_start = time.perf_counter()
+
     try:
+        log_pipeline_event(
+            db=db,
+            invoice_file_id=invoice_file.id,
+            stage="upload.complete_requested",
+            status="started",
+            message="Mobile client reported direct S3 upload complete",
+            metadata={"s3_key": s3_key},
+            commit=True,
+        )
         validate_invoice_s3_key(s3_key)
 
         metadata = get_s3_object_metadata(s3_key=s3_key)
@@ -296,21 +355,52 @@ def complete_invoice_upload(
             content=get_s3_object_prefix_bytes(s3_key=s3_key),
             content_type=content_type,
         )
+        log_pipeline_event(
+            db=db,
+            invoice_file_id=invoice_file.id,
+            stage="storage.validated",
+            status="success",
+            message="S3 object metadata and file signature validated",
+            duration_ms=_elapsed_ms(complete_start),
+            metadata={
+                "size_bytes": content_length,
+                "content_type": content_type,
+            },
+        )
 
         mark_invoice_uploaded(
             invoice_file=invoice_file,
             size_bytes=content_length,
             content_type=content_type,
         )
+        log_pipeline_event(
+            db=db,
+            invoice_file_id=invoice_file.id,
+            stage="processing.queued",
+            status="success",
+            message="Invoice processing queued",
+        )
 
         db.commit()
 
     except ValueError as e:
         db.rollback()
+        _try_log_pipeline_failure(
+            db=db,
+            invoice_file_id=invoice_file.id,
+            stage="upload.complete_failed",
+            message=str(e),
+        )
         raise HTTPException(status_code=400, detail=str(e))
 
-    except Exception:
+    except Exception as exc:
         db.rollback()
+        _try_log_pipeline_failure(
+            db=db,
+            invoice_file_id=invoice_file.id,
+            stage="upload.complete_failed",
+            message=str(exc),
+        )
         raise HTTPException(
             status_code=500,
             detail="Could not complete invoice upload",
@@ -389,6 +479,13 @@ def retry_invoice_processing(
     invoice_file.status = "uploaded"
     invoice_file.error_message = None
     invoice_file.processed_at = None
+    log_pipeline_event(
+        db=db,
+        invoice_file_id=invoice_file.id,
+        stage="processing.retry_queued",
+        status="success",
+        message="Invoice processing retry queued",
+    )
     db.commit()
 
     background_tasks.add_task(
@@ -528,6 +625,20 @@ def get_invoice_result(
     }
 
 
+def get_invoice_processing_logs(
+    db: Session,
+    user_id: int,
+    invoice_file_id: str,
+) -> list[dict]:
+    invoice_uuid = _parse_invoice_uuid(invoice_file_id)
+    logs = list_invoice_processing_logs_for_user(
+        db=db,
+        invoice_file_id=invoice_uuid,
+        user_id=user_id,
+    )
+    return [_pipeline_log_payload(log) for log in logs]
+
+
 def _invoice_file_history_payload(
     invoice_file,
     invoice: Invoice | None,
@@ -572,3 +683,40 @@ def _invoice_payload(invoice: Invoice) -> dict:
             for item in invoice.items
         ],
     }
+
+
+def _pipeline_log_payload(log) -> dict:
+    return {
+        "id": log.id,
+        "invoice_file_id": str(log.invoice_file_id),
+        "stage": log.stage,
+        "status": log.status,
+        "message": log.message,
+        "duration_ms": log.duration_ms,
+        "metadata": log.metadata_json,
+        "created_at": log.created_at.isoformat(),
+    }
+
+
+def _elapsed_ms(started_at: float) -> int:
+    return int((time.perf_counter() - started_at) * 1000)
+
+
+def _try_log_pipeline_failure(
+    db: Session,
+    invoice_file_id: UUID,
+    stage: str,
+    message: str,
+) -> None:
+    try:
+        log_pipeline_event(
+            db=db,
+            invoice_file_id=invoice_file_id,
+            stage=stage,
+            status="failed",
+            message=message,
+            commit=True,
+        )
+    except Exception:
+        db.rollback()
+        logger.exception("Could not persist pipeline failure log for %s", invoice_file_id)

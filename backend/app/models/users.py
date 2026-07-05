@@ -33,5 +33,10 @@ class User(Base):
         DateTime(timezone=True),
         nullable=True,
     )
+    password_reset_pin_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    password_reset_expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
 
     invoices: Mapped[list["Invoice"]] = relationship(back_populates="user")

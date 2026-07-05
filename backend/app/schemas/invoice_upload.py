@@ -43,3 +43,14 @@ class InvoiceUsageResponse(BaseModel):
     free_scan_limit: int
     remaining_free_scans: int
     is_pro: bool
+
+
+class InvoiceProcessingLogResponse(BaseModel):
+    id: int
+    invoice_file_id: str
+    stage: str
+    status: str
+    message: str | None = None
+    duration_ms: int | None = None
+    metadata: dict[str, Any] | None = None
+    created_at: str

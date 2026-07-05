@@ -17,6 +17,7 @@ from app.schemas.invoice_upload import (
     CreateUploadUrlResponse,
     CompleteUploadRequest,
     CompleteUploadResponse,
+    InvoiceProcessingLogResponse,
     InvoiceFileStatusResponse,
     InvoiceUsageResponse,
 )
@@ -27,6 +28,7 @@ from app.services.invoice_upload_service import (
     get_invoice_upload_status,
     get_invoice_result,
     get_invoice_history,
+    get_invoice_processing_logs,
     get_invoice_usage,
     retry_invoice_processing,
 )
@@ -211,6 +213,22 @@ def get_upload_result(
     current_user: User = Depends(get_current_user),
 ):
     return get_invoice_result(
+        db=db,
+        user_id=current_user.id,
+        invoice_file_id=invoice_file_id,
+    )
+
+
+@router.get(
+    "/files/{invoice_file_id}/logs",
+    response_model=list[InvoiceProcessingLogResponse],
+)
+def get_upload_logs(
+    invoice_file_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return get_invoice_processing_logs(
         db=db,
         user_id=current_user.id,
         invoice_file_id=invoice_file_id,

@@ -60,6 +60,34 @@ class ResendVerificationRequest(BaseModel):
         return normalize_email(value)
 
 
+class PasswordResetRequest(BaseModel):
+    email: str = Field(..., min_length=3, max_length=255)
+
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, value: str) -> str:
+        return normalize_email(value)
+
+
+class ResetPasswordRequest(BaseModel):
+    email: str = Field(..., min_length=3, max_length=255)
+    pin: str = Field(..., min_length=6, max_length=6)
+    password: str = Field(..., min_length=8, max_length=128)
+
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, value: str) -> str:
+        return normalize_email(value)
+
+    @field_validator("pin")
+    @classmethod
+    def validate_pin(cls, value: str) -> str:
+        pin = value.strip()
+        if not pin.isdigit():
+            raise ValueError("Reset PIN must contain 6 digits")
+        return pin
+
+
 class UserResponse(BaseModel):
     id: str
     email: str
@@ -74,5 +102,11 @@ class TokenResponse(BaseModel):
 
 
 class RegisterResponse(BaseModel):
+    message: str
+    email: str
+    email_sent: bool = True
+
+
+class PasswordResetResponse(BaseModel):
     message: str
     email: str

@@ -19,6 +19,7 @@
     },
     "android": {
       "package": "com.invoicepocket.mobile",
+      "softwareKeyboardLayoutMode": "resize",
       "permissions": [
         "CAMERA",
         "READ_EXTERNAL_STORAGE"

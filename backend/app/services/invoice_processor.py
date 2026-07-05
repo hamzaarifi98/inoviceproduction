@@ -18,6 +18,7 @@ from app.crud.invoices import save_extracted_invoice
 from app.services.s3_service import download_s3_object_to_file
 from app.services.llm_extraction import LLMExtractionService
 from app.services.google_ocr2 import GoogleOCRFastService
+from app.services.pipeline_logger import log_pipeline_event
 
 ocr_service = GoogleOCRFastService()
 llm_service = LLMExtractionService()
@@ -44,9 +45,17 @@ def process_invoice_from_s3(
             return
 
         mark_invoice_processing(invoice_file)
-        db.commit()
         processing_start = time.perf_counter()
         logger.info("Invoice processing started: invoice_file_id=%s", invoice_file_id)
+        log_pipeline_event(
+            db=db,
+            invoice_file_id=invoice_uuid,
+            stage="processing.started",
+            status="started",
+            message="Invoice processing started",
+            metadata={"s3_key": s3_key},
+            commit=True,
+        )
 
         extension = Path(s3_key).suffix.lower()
 
@@ -63,6 +72,16 @@ def process_invoice_from_s3(
             "Invoice downloaded to temporary file in %.2fs",
             time.perf_counter() - phase_start,
         )
+        log_pipeline_event(
+            db=db,
+            invoice_file_id=invoice_uuid,
+            stage="storage.downloaded",
+            status="success",
+            message="Invoice downloaded from S3",
+            duration_ms=_elapsed_ms(phase_start),
+            metadata={"extension": extension},
+            commit=True,
+        )
 
         phase_start = time.perf_counter()
         logger.info("Starting Google OCR text extraction")
@@ -71,6 +90,16 @@ def process_invoice_from_s3(
             "Google OCR text extraction finished in %.2fs",
             time.perf_counter() - phase_start,
         )
+        log_pipeline_event(
+            db=db,
+            invoice_file_id=invoice_uuid,
+            stage="ocr.completed",
+            status="success",
+            message="Google OCR text extraction completed",
+            duration_ms=_elapsed_ms(phase_start),
+            metadata={"text_length": len(raw_ocr_text or "")},
+            commit=True,
+        )
 
         phase_start = time.perf_counter()
         logger.info("Starting LLM invoice extraction")
@@ -78,6 +107,15 @@ def process_invoice_from_s3(
         logger.info(
             "LLM invoice extraction finished in %.2fs",
             time.perf_counter() - phase_start,
+        )
+        log_pipeline_event(
+            db=db,
+            invoice_file_id=invoice_uuid,
+            stage="llm.completed",
+            status="success",
+            message="LLM invoice extraction completed",
+            duration_ms=_elapsed_ms(phase_start),
+            commit=True,
         )
         extracted_json = build_invoice_payload(extracted_invoice)
 
@@ -91,18 +129,35 @@ def process_invoice_from_s3(
         )
 
         mark_invoice_processed(invoice_file)
-        db.commit()
         logger.info(
             "Invoice DB save finished in %.2fs",
             time.perf_counter() - phase_start,
         )
+        log_pipeline_event(
+            db=db,
+            invoice_file_id=invoice_uuid,
+            stage="database.saved",
+            status="success",
+            message="Extracted invoice saved",
+            duration_ms=_elapsed_ms(phase_start),
+        )
+        db.commit()
         logger.info(
             "Invoice processing completed in %.2fs: invoice_file_id=%s",
             time.perf_counter() - processing_start,
             invoice_file_id,
         )
+        log_pipeline_event(
+            db=db,
+            invoice_file_id=invoice_uuid,
+            stage="processing.completed",
+            status="success",
+            message="Invoice processing completed",
+            duration_ms=_elapsed_ms(processing_start),
+            commit=True,
+        )
 
-    except Exception:
+    except Exception as exc:
         db.rollback()
 
         try:
@@ -118,6 +173,13 @@ def process_invoice_from_s3(
                     invoice_file=invoice_file,
                     error_message="Invoice processing failed",
                 )
+                log_pipeline_event(
+                    db=db,
+                    invoice_file_id=invoice_uuid,
+                    stage="processing.failed",
+                    status="failed",
+                    message=str(exc),
+                )
                 db.commit()
 
         except Exception:
@@ -130,6 +192,10 @@ def process_invoice_from_s3(
 
         if temp_file_path and os.path.exists(temp_file_path):
             os.remove(temp_file_path)
+
+
+def _elapsed_ms(started_at: float) -> int:
+    return int((time.perf_counter() - started_at) * 1000)
 
 
 def build_invoice_payload(extracted_invoice) -> dict:

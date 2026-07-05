@@ -1,4 +1,5 @@
 import secrets
+import logging
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
@@ -19,20 +20,30 @@ from app.crud.users import (
     create_user,
     get_user_by_email,
     mark_email_verified,
+    set_password_hash,
+    set_password_reset_pin,
     set_email_verification_pin,
 )
 from app.models.users import User
 from app.schemas.auth import (
     LoginRequest,
     normalize_email,
+    PasswordResetRequest,
+    PasswordResetResponse,
     RegisterRequest,
     RegisterResponse,
     ResendVerificationRequest,
+    ResetPasswordRequest,
     TokenResponse,
     UserResponse,
     VerifyEmailRequest,
 )
-from app.services.email_service import send_verification_pin
+from app.services.email_service import (
+    EmailDeliveryError,
+    EmailDeliveryResult,
+    send_password_reset_pin,
+    send_verification_pin,
+)
 
 
 router = APIRouter(
@@ -41,6 +52,8 @@ router = APIRouter(
 )
 
 VERIFICATION_PIN_EXPIRE_MINUTES = 10
+PASSWORD_RESET_PIN_EXPIRE_MINUTES = 10
+logger = logging.getLogger(__name__)
 
 
 @router.post(
@@ -91,40 +104,43 @@ def register(
         )
 
     try:
-        if user is None:
-            user = create_user(
-                db=db,
-                email=email,
-                password_hash=hash_password(request.password),
-            )
-        else:
-            user.password_hash = hash_password(request.password)
-
-        pin = _new_verification_pin()
+        user = _prepare_unverified_user(
+            db=db,
+            existing_user=user,
+            email=email,
+            password=request.password,
+        )
+        pin = _new_pin()
         set_email_verification_pin(
             user=user,
             pin_hash=hash_password(pin),
-            expires_at=_verification_expires_at(),
+            expires_at=_pin_expires_at(VERIFICATION_PIN_EXPIRE_MINUTES),
         )
+        db.flush()
+        delivery = send_verification_pin(email=user.email, pin=pin)
         db.commit()
         db.refresh(user)
-        send_verification_pin(email=user.email, pin=pin)
     except IntegrityError:
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Email is already registered",
         )
-    except Exception:
+    except EmailDeliveryError as exc:
         db.rollback()
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Could not send verification email",
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(exc),
         )
+    except Exception:
+        db.rollback()
+        logger.exception("Could not register user %s", email)
+        raise HTTPException(status_code=500, detail="Could not create account")
 
     return {
-        "message": "Verification PIN sent",
+        "message": _pin_delivery_message("Verification PIN", delivery),
         "email": user.email,
+        "email_sent": delivery.sent,
     }
 
 
@@ -201,25 +217,107 @@ def resend_verification(
         )
 
     try:
-        pin = _new_verification_pin()
+        pin = _new_pin()
         set_email_verification_pin(
             user=user,
             pin_hash=hash_password(pin),
-            expires_at=_verification_expires_at(),
+            expires_at=_pin_expires_at(VERIFICATION_PIN_EXPIRE_MINUTES),
         )
+        db.flush()
+        delivery = send_verification_pin(email=user.email, pin=pin)
         db.commit()
-        send_verification_pin(email=user.email, pin=pin)
-    except Exception:
+    except EmailDeliveryError as exc:
         db.rollback()
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Could not send verification email",
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(exc),
         )
+    except Exception:
+        db.rollback()
+        logger.exception("Could not resend verification PIN to %s", email)
+        raise HTTPException(status_code=500, detail="Could not resend verification PIN")
 
     return {
-        "message": "Verification PIN sent",
+        "message": _pin_delivery_message("Verification PIN", delivery),
         "email": user.email,
+        "email_sent": delivery.sent,
     }
+
+
+@router.post(
+    "/request-password-reset",
+    response_model=PasswordResetResponse,
+)
+def request_password_reset(
+    http_request: Request,
+    request: PasswordResetRequest,
+    db: Session = Depends(get_db),
+):
+    email = request.email
+    enforce_rate_limit(http_request, "request-password-reset", email, max_attempts=5)
+
+    user = get_user_by_email(db=db, email=email)
+    if user is None or user.is_guest:
+        return _password_reset_response(email)
+
+    try:
+        pin = _new_pin()
+        set_password_reset_pin(
+            user=user,
+            pin_hash=hash_password(pin),
+            expires_at=_pin_expires_at(PASSWORD_RESET_PIN_EXPIRE_MINUTES),
+        )
+        db.flush()
+        send_password_reset_pin(email=user.email, pin=pin)
+        db.commit()
+    except EmailDeliveryError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(exc),
+        )
+    except Exception:
+        db.rollback()
+        logger.exception("Could not request password reset for %s", email)
+        raise HTTPException(status_code=500, detail="Could not request password reset")
+
+    return _password_reset_response(user.email)
+
+
+@router.post(
+    "/reset-password",
+    response_model=TokenResponse,
+)
+def reset_password(
+    http_request: Request,
+    request: ResetPasswordRequest,
+    db: Session = Depends(get_db),
+):
+    email = request.email
+    enforce_rate_limit(http_request, "reset-password", email, max_attempts=8)
+
+    user = get_user_by_email(db=db, email=email)
+    if user is None or user.is_guest:
+        raise _invalid_reset_pin_error()
+
+    if not user.password_reset_pin_hash or not user.password_reset_expires_at:
+        raise _invalid_reset_pin_error()
+
+    if _is_expired(user.password_reset_expires_at):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password reset PIN expired",
+        )
+
+    if not verify_password(request.pin, user.password_reset_pin_hash):
+        raise _invalid_reset_pin_error()
+
+    set_password_hash(user, hash_password(request.password))
+    mark_email_verified(user)
+    db.commit()
+    db.refresh(user)
+
+    return _token_response(user)
 
 
 @router.post(
@@ -314,12 +412,52 @@ def _authenticate_user(
     return user
 
 
-def _new_verification_pin() -> str:
+def _prepare_unverified_user(
+    db: Session,
+    existing_user: User | None,
+    email: str,
+    password: str,
+) -> User:
+    if existing_user is None:
+        return create_user(
+            db=db,
+            email=email,
+            password_hash=hash_password(password),
+        )
+
+    existing_user.password_hash = hash_password(password)
+    return existing_user
+
+
+def _new_pin() -> str:
     return f"{secrets.randbelow(1_000_000):06d}"
 
 
-def _verification_expires_at() -> datetime:
-    return datetime.now(timezone.utc) + timedelta(minutes=VERIFICATION_PIN_EXPIRE_MINUTES)
+def _pin_expires_at(minutes: int) -> datetime:
+    return datetime.now(timezone.utc) + timedelta(minutes=minutes)
+
+
+def _pin_delivery_message(
+    label: str,
+    delivery: EmailDeliveryResult,
+) -> str:
+    if delivery.sent:
+        return f"{label} sent"
+    return f"{label} generated. Check the server logs."
+
+
+def _password_reset_response(email: str) -> dict:
+    return {
+        "message": "If an account exists for this email, a password reset PIN was sent.",
+        "email": email,
+    }
+
+
+def _invalid_reset_pin_error() -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail="Invalid password reset PIN",
+    )
 
 
 def _is_expired(expires_at: datetime) -> bool:
