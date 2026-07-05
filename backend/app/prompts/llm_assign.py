@@ -2,6 +2,18 @@ INVOICE_EXTRACTION_PROMPT = """
 You extract structured invoice data from OCR text.
 Return only fields supported by the OCR text.
 If a value is missing, unclear, damaged, unreadable, or invalid, return null. Never invent values.
+If there is extracted items json exactly like this schema:
+ЕТИ поп кек банана 35гр
+KOM
+1,0
+24,00
+11,81
+283,43: this is without tax
+5
+0,59
+12,40
+297,60: this is total -> So you extract the total as this one.
+18 038258
 For each item:
 - If the product name is visible but the price is unclear, set line_total to null.
 - Do not invent prices.
