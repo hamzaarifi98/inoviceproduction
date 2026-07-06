@@ -5,7 +5,7 @@ import { Card, EmptyState, StatsCard } from "../components/Card";
 import { CategoryRow } from "../components/CategoryRow";
 import { styles } from "../styles/styles";
 import { money } from "../utils/currency";
-import { detectCategory, summarizeCategories } from "../utils/categories";
+import { getItemCategoryId, getRecordCategoryId, summarizeCategories } from "../utils/categories";
 import { getInvoiceAmount, getInvoiceCurrency, getItemAmount, getTotalSpent } from "../utils/invoices";
 
 export function CategoriesScreen({ invoices, t }) {
@@ -71,9 +71,8 @@ function getCategoryDetails(records, categoryId) {
   records.forEach((record) => {
     const invoice = record.invoice || {};
     const invoiceItems = invoice.items || [];
-    const recordCategoryId = record.category?.id || detectCategory(invoice).id;
 
-    if (!invoiceItems.length && recordCategoryId === categoryId) {
+    if (!invoiceItems.length && getRecordCategoryId(record) === categoryId) {
       items.push({
         invoiceId: record.invoice_file_id,
         name: invoice.supplier_name || record.original_filename || "Invoice",
@@ -85,9 +84,7 @@ function getCategoryDetails(records, categoryId) {
     }
 
     invoiceItems.forEach((item) => {
-      const itemCategory = String(item.category || recordCategoryId || "other").trim().toLowerCase();
-
-      if (itemCategory === categoryId) {
+      if (getItemCategoryId(record, item) === categoryId) {
         items.push({
           invoiceId: record.invoice_file_id,
           name: item.item_name || "Item",

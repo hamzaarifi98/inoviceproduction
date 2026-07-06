@@ -36,15 +36,14 @@ export function summarizeCategories(invoices) {
     const items = invoice.items || [];
 
     if (!items.length) {
-      const category = record.category || detectCategory(invoice);
-      const summary = totals.get(category.id) || totals.get("other");
+      const summary = totals.get(getRecordCategoryId(record)) || totals.get("other");
       summary.amount += getInvoiceAmount(record);
       summary.count += 1;
       return;
     }
 
     items.forEach((item) => {
-      const summary = totals.get(normalizeCategoryId(item.category)) || totals.get("other");
+      const summary = totals.get(getItemCategoryId(record, item)) || totals.get("other");
       summary.amount += getItemAmount(item);
       summary.count += 1;
     });
@@ -53,7 +52,34 @@ export function summarizeCategories(invoices) {
   return [...totals.values()];
 }
 
-function normalizeCategoryId(category) {
+// The LLM tags each scanned item with its own category; that's the authoritative
+// source. Only fall back to the whole-invoice guess (manual invoices, or items the
+// extraction left uncategorized) when the item itself has nothing.
+export function getItemCategoryId(record, item) {
+  return normalizeCategoryId(item?.category || getRecordCategoryId(record));
+}
+
+export function getRecordCategoryId(record) {
+  return normalizeCategoryId(record.category?.id || detectCategory(record.invoice || {}).id);
+}
+
+export function getInvoiceCategoryId(record) {
+  const items = record.invoice?.items || [];
+
+  if (!items.length) {
+    return getRecordCategoryId(record);
+  }
+
+  const totals = new Map();
+  items.forEach((item) => {
+    const categoryId = getItemCategoryId(record, item);
+    totals.set(categoryId, (totals.get(categoryId) || 0) + getItemAmount(item));
+  });
+
+  return [...totals.entries()].sort((a, b) => b[1] - a[1])[0][0];
+}
+
+export function normalizeCategoryId(category) {
   const categoryId = String(category || "other").trim().toLowerCase();
   return categories.some((item) => item.id === categoryId) ? categoryId : "other";
 }

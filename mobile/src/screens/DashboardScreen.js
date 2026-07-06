@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Modal, Pressable, Text, View } from "react-native";
 
 import { Card, EmptyState } from "../components/Card";
 import { InvoiceSummary } from "../components/InvoiceSummary";
@@ -12,7 +12,7 @@ import {
   getTotalSpent,
 } from "../utils/invoices";
 
-export function DashboardScreen({ app, t, onOpenSettings }) {
+export function DashboardScreen({ app, t }) {
   const processed = app.invoices.filter((record) => record.invoice);
   const recent = app.invoices.slice(0, 3);
 
@@ -20,9 +20,11 @@ export function DashboardScreen({ app, t, onOpenSettings }) {
   const invoicesCount = app.invoices.length;
   const pendingCount = app.invoices.filter((record) => !record.invoice).length;
 
+  const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
+
   const uploadMonths = useMemo(
-    () => getAvailableUploadMonths(app.invoices),
-    [app.invoices]
+    () => getAvailableUploadMonths(processed),
+    [processed]
   );
 
   const currentMonth = getCurrentMonth();
@@ -72,17 +74,6 @@ export function DashboardScreen({ app, t, onOpenSettings }) {
             <Text style={styles.monthlyTitle}>{t("monthlyBudget")}</Text>
             <Text style={styles.monthlySubtitle}>{t("monthlyBudgetCopy")}</Text>
           </View>
-
-          <Pressable
-            onPress={onOpenSettings}
-            accessibilityLabel={t("settings")}
-            style={({ pressed }) => [
-              styles.monthlyIconBubble,
-              pressed && styles.pressed,
-            ]}
-          >
-            <Text style={styles.monthlyIconText}>↗</Text>
-          </Pressable>
         </View>
 
         <View style={styles.monthlyCompareRow}>
@@ -97,7 +88,14 @@ export function DashboardScreen({ app, t, onOpenSettings }) {
             </View>
           </View>
 
-          <View style={styles.monthlyCompareItem}>
+          <Pressable
+            disabled={!selectableMonths.length}
+            onPress={() => setIsMonthPickerOpen(true)}
+            style={({ pressed }) => [
+              styles.monthlyCompareItem,
+              pressed && selectableMonths.length && styles.pressed,
+            ]}
+          >
             <Text style={styles.monthlyLabel}>
               {selectedMonth ? getMonthLabel(selectedMonth) : t("selectMonth")}
             </Text>
@@ -108,38 +106,50 @@ export function DashboardScreen({ app, t, onOpenSettings }) {
             <View style={styles.monthlyBarTrack}>
               <View style={[styles.monthlyBarFillSoft, { width: selectedPercent }]} />
             </View>
-          </View>
+          </Pressable>
         </View>
 
-        {selectableMonths.length ? (
-          <View style={styles.monthChipsWrap}>
-            {selectableMonths.map((month) => (
-              <Pressable
-                key={month}
-                onPress={() => setSelectedMonth(month)}
-                style={({ pressed }) => [
-                  styles.monthChip,
-                  selectedMonth === month && styles.monthChipActive,
-                  pressed && styles.pressed,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.monthChipText,
-                    selectedMonth === month && styles.monthChipTextActive,
-                  ]}
-                >
-                  {getMonthLabel(month)}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-        ) : (
+        {!selectableMonths.length && (
           <View style={styles.emptyMonthBox}>
             <Text style={styles.emptyMonthText}>{t("noPastMonths")}</Text>
           </View>
         )}
       </View>
+
+      <Modal
+        visible={isMonthPickerOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsMonthPickerOpen(false)}
+      >
+        <Pressable style={styles.modalOverlay} onPress={() => setIsMonthPickerOpen(false)}>
+          <Pressable style={[styles.card, styles.exportModalCard]} onPress={() => {}}>
+            <View style={styles.actionRow}>
+              <Text style={styles.sectionTitle}>{t("selectMonth")}</Text>
+              <Text style={styles.helperText}>{t("monthlyBudgetCopy")}</Text>
+            </View>
+            {selectableMonths.map((month) => (
+              <Pressable
+                key={month}
+                onPress={() => {
+                  setSelectedMonth(month);
+                  setIsMonthPickerOpen(false);
+                }}
+                style={({ pressed }) => [styles.settingsRow, pressed && styles.pressed]}
+              >
+                <Text style={styles.settingsLabel}>{getMonthLabel(month)}</Text>
+                <Text style={styles.settingsValue}>{money(getSpentForUploadMonth(processed, month))}</Text>
+              </Pressable>
+            ))}
+            <Pressable
+              onPress={() => setIsMonthPickerOpen(false)}
+              style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
+            >
+              <Text style={styles.secondaryText}>{t("cancel")}</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       <View style={styles.recentInvoicesCard}>
         <View style={styles.recentInvoicesHeader}>

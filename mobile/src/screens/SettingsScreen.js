@@ -78,11 +78,13 @@ export function SettingsScreen({ app, t, onLogin }) {
       </Card>
 
       <Card style={styles.billingCard}>
-        <SettingsSectionTitle title={t("billing")} copy={t("proBillingCopy")} />
-        <View style={styles.priceRow}>
-          <Text style={styles.priceAmount}>2.99</Text>
-          <Text style={styles.pricePeriod}>{t("perMonth")}</Text>
-        </View>
+        <SettingsSectionTitle title={t("billing")} copy={isPro ? t("proActiveCopy") : t("proBillingCopy")} />
+        {!isPro && (
+          <View style={styles.priceRow}>
+            <Text style={styles.priceAmount}>2.99</Text>
+            <Text style={styles.pricePeriod}>{t("perMonth")}</Text>
+          </View>
+        )}
         <FeatureRow text={t("proFeatureUnlimited")} />
         <FeatureRow text={t("proFeatureHistory")} />
         <FeatureRow text={t("proFeatureExport")} />
@@ -94,7 +96,6 @@ export function SettingsScreen({ app, t, onLogin }) {
             onPress={subscribeToPro}
           />
         )}
-        {isPro && <Text style={styles.settingsMessage}>{t("proActiveCopy")}</Text>}
         {!!message && <Text style={[styles.settingsMessage, !isPro && styles.errorText]}>{message}</Text>}
       </Card>
 

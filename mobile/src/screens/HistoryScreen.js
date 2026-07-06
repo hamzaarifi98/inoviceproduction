@@ -1,10 +1,15 @@
 import { useState } from "react";
 import { File, Paths } from "expo-file-system";
 import * as Sharing from "expo-sharing";
-import { Alert, Share, Text, View } from "react-native";
+import { Alert, Modal, Pressable, Share, Text, View } from "react-native";
 
-import { invoiceToCsvRows, pollForResult } from "../api/invoices";
-import { Card, EmptyState, PrimaryButton, StatsCard } from "../components/Card";
+import {
+  invoiceCategoryCsvRows,
+  invoiceItemsCsvRows,
+  invoiceSummaryCsvRows,
+  pollForResult,
+} from "../api/invoices";
+import { ActionTile, Card, EmptyState, PrimaryButton, StatsCard } from "../components/Card";
 import { ExpandableInvoice } from "../components/InvoiceSummary";
 import { DEFAULT_CURRENCY } from "../constants";
 import { styles } from "../styles/styles";
@@ -12,20 +17,33 @@ import { detectCategory } from "../utils/categories";
 import { money } from "../utils/currency";
 import { getInvoiceAmount, getTotalSpent } from "../utils/invoices";
 
+const EXPORT_OPTIONS = [
+  { key: "summary", titleKey: "exportSummaryOption", copyKey: "exportSummaryOptionCopy", build: invoiceSummaryCsvRows },
+  { key: "items", titleKey: "exportItemsOption", copyKey: "exportItemsOptionCopy", build: invoiceItemsCsvRows },
+  { key: "category", titleKey: "exportCategoryOption", copyKey: "exportCategoryOptionCopy", build: invoiceCategoryCsvRows },
+];
+
 export function HistoryScreen({ app, t }) {
   const [openInvoiceId, setOpenInvoiceId] = useState(null);
   const [retryingId, setRetryingId] = useState(null);
+  const [isExportPickerOpen, setIsExportPickerOpen] = useState(false);
   const invoices = app.invoices;
   const processed = invoices.filter((record) => record.invoice);
 
-  async function exportInvoices() {
+  function openExportPicker() {
     if (!processed.length) {
       Alert.alert(t("exportInvoices"), t("nothingToExport"));
       return;
     }
 
-    const csv = invoiceToCsvRows(processed);
-    const file = new File(Paths.cache, `invoice-pocket-${new Date().toISOString().replace(/[:.]/g, "-")}.csv`);
+    setIsExportPickerOpen(true);
+  }
+
+  async function exportInvoices(buildCsvRows) {
+    setIsExportPickerOpen(false);
+
+    const csv = buildCsvRows(processed);
+    const file = new File(Paths.cache, `ai-fiskalna-${new Date().toISOString().replace(/[:.]/g, "-")}.csv`);
 
     try {
       file.create({ overwrite: true });
@@ -129,7 +147,7 @@ export function HistoryScreen({ app, t }) {
           <Text style={styles.sectionTitle}>{t("exportInvoices")}</Text>
           <Text style={styles.helperText}>{t("exportCopy")}</Text>
         </View>
-        <PrimaryButton title={t("exportCsv")} disabled={!processed.length} onPress={exportInvoices} />
+        <PrimaryButton title={t("exportCsv")} disabled={!processed.length} onPress={openExportPicker} />
       </Card>
       <Card>
         {invoices.length ? invoices.map((record) => (
@@ -145,6 +163,31 @@ export function HistoryScreen({ app, t }) {
           />
         )) : <EmptyState title={t("historyEmpty")} copy={t("historyCopy")} />}
       </Card>
+
+      <Modal visible={isExportPickerOpen} transparent animationType="fade" onRequestClose={() => setIsExportPickerOpen(false)}>
+        <Pressable style={styles.modalOverlay} onPress={() => setIsExportPickerOpen(false)}>
+          <Pressable style={[styles.card, styles.exportModalCard]} onPress={() => {}}>
+            <View style={styles.actionRow}>
+              <Text style={styles.sectionTitle}>{t("exportInvoices")}</Text>
+              <Text style={styles.helperText}>{t("exportOptionsCopy")}</Text>
+            </View>
+            {EXPORT_OPTIONS.map((option) => (
+              <ActionTile
+                key={option.key}
+                title={t(option.titleKey)}
+                copy={t(option.copyKey)}
+                onPress={() => exportInvoices(option.build)}
+              />
+            ))}
+            <Pressable
+              onPress={() => setIsExportPickerOpen(false)}
+              style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
+            >
+              <Text style={styles.secondaryText}>{t("cancel")}</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </>
   );
 }

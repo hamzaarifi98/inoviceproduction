@@ -67,7 +67,7 @@ export default function App() {
           t={t}
         />
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-          {route === "dashboard" && <DashboardScreen app={app} t={t} onOpenSettings={openSettings} />}
+          {route === "dashboard" && <DashboardScreen app={app} t={t} />}
           {route === "upload" && <UploadScreen app={app} t={t} onManagePro={openSettings} />}
           {route === "categories" && <CategoriesScreen invoices={app.invoices} t={t} />}
           {route === "history" && <HistoryScreen app={app} t={t} />}

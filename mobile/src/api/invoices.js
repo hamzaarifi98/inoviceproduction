@@ -1,3 +1,5 @@
+import { getInvoiceCategoryId, getItemCategoryId, getRecordCategoryId } from "../utils/categories";
+
 export async function pollForResult(request, invoiceFileId, setStatus) {
   const maxAttempts = 60;
 
@@ -15,21 +17,14 @@ export async function pollForResult(request, invoiceFileId, setStatus) {
   return request(`/invoices/files/${invoiceFileId}/result`);
 }
 
-export function invoiceToCsvRows(records) {
+export function invoiceSummaryCsvRows(records) {
   const rows = [[
-    "Invoice file ID",
     "Invoice number",
     "Supplier",
     "Date",
-    "Status",
-    "Category",
-    "Item",
-    "Quantity",
-    "Unit price",
-    "Line total",
-    "Subtotal",
+    "Subtotal (without tax)",
     "Tax",
-    "Invoice total",
+    "Total (with tax)",
     "Currency",
   ]];
 
@@ -37,30 +32,87 @@ export function invoiceToCsvRows(records) {
     .filter((record) => record.invoice)
     .forEach((record) => {
       const invoice = record.invoice;
-      const items = invoice.items?.length
-        ? invoice.items
-        : [{ item_name: "", quantity: "", unit_price: "", total_price: "", category: record.category?.id }];
+      rows.push([
+        invoice.invoice_number || "",
+        invoice.supplier_name || "",
+        invoice.invoice_date || "",
+        invoice.subtotal || "",
+        invoice.tax_amount || "",
+        invoice.total_amount || record.amount || "",
+        invoice.currency || record.currency || "MKD",
+      ]);
+    });
+
+  return rowsToCsv(rows);
+}
+
+export function invoiceItemsCsvRows(records) {
+  const rows = [[
+    "Invoice number",
+    "Supplier",
+    "Date",
+    "Category",
+    "Item",
+    "Quantity",
+    "Unit price",
+    "Item total",
+    "Currency",
+  ]];
+
+  records
+    .filter((record) => record.invoice)
+    .forEach((record) => {
+      const invoice = record.invoice;
+      const items = invoice.items?.length ? invoice.items : [null];
 
       items.forEach((item) => {
         rows.push([
-          record.invoice_file_id || invoice.invoice_file_id || "",
           invoice.invoice_number || "",
           invoice.supplier_name || "",
           invoice.invoice_date || "",
-          record.status || "",
-          record.category?.id || item.category || "other",
-          item.item_name || item.name || "",
-          item.quantity || "",
-          item.unit_price || "",
-          item.total_price || item.line_total || "",
-          invoice.subtotal || "",
-          invoice.tax_amount || "",
-          invoice.total_amount || record.amount || "",
+          item ? getItemCategoryId(record, item) : getRecordCategoryId(record),
+          item?.item_name || item?.name || "",
+          item?.quantity || "",
+          item?.unit_price || "",
+          item?.total_price || item?.line_total || "",
           invoice.currency || record.currency || "MKD",
         ]);
       });
     });
 
+  return rowsToCsv(rows);
+}
+
+export function invoiceCategoryCsvRows(records) {
+  const rows = [[
+    "Category",
+    "Invoice number",
+    "Supplier",
+    "Date",
+    "Total (with tax)",
+    "Currency",
+  ]];
+
+  records
+    .filter((record) => record.invoice)
+    .map((record) => ({ record, category: getInvoiceCategoryId(record) }))
+    .sort((a, b) => a.category.localeCompare(b.category))
+    .forEach(({ record, category }) => {
+      const invoice = record.invoice;
+      rows.push([
+        category,
+        invoice.invoice_number || "",
+        invoice.supplier_name || "",
+        invoice.invoice_date || "",
+        invoice.total_amount || record.amount || "",
+        invoice.currency || record.currency || "MKD",
+      ]);
+    });
+
+  return rowsToCsv(rows);
+}
+
+function rowsToCsv(rows) {
   return rows.map((row) => row.map(escapeCsvCell).join(",")).join("\r\n");
 }
 

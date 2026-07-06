@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Invoice Pocket",
+    "name": "AI Fiskalna",
     "slug": "invoice-pocket",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -13,8 +13,8 @@
       "supportsTablet": true,
       "icon": "./assets/icon.png",
       "infoPlist": {
-        "NSCameraUsageDescription": "Invoice Pocket uses the camera to scan invoice photos.",
-        "NSPhotoLibraryUsageDescription": "Invoice Pocket lets you choose invoice photos from your library."
+        "NSCameraUsageDescription": "AI Fiskalna uses the camera to scan invoice photos.",
+        "NSPhotoLibraryUsageDescription": "AI Fiskalna lets you choose invoice photos from your library."
       }
     },
     "android": {

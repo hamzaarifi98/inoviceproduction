@@ -276,6 +276,19 @@ export const styles = StyleSheet.create({
     elevation: 4,
   },
 
+  modalOverlay: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 24,
+    backgroundColor: "rgba(6, 59, 58, 0.55)",
+  },
+
+  exportModalCard: {
+    width: "100%",
+    maxWidth: 380,
+  },
+
   statsCard: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -412,23 +425,6 @@ export const styles = StyleSheet.create({
     lineHeight: 24,
   },
 
-  monthlyIconBubble: {
-    width: 46,
-    height: 46,
-    borderRadius: 8,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: palette.ivory,
-    borderWidth: 1,
-    borderColor: palette.border,
-  },
-
-  monthlyIconText: {
-    color: palette.emerald900,
-    fontSize: 24,
-    fontWeight: "900",
-  },
-
   monthlyCompareRow: {
     flexDirection: "row",
     gap: 12,
@@ -474,38 +470,6 @@ export const styles = StyleSheet.create({
     height: "100%",
     borderRadius: 999,
     backgroundColor: palette.gold,
-  },
-
-  monthChipsWrap: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-
-  monthChip: {
-    minHeight: 38,
-    paddingHorizontal: 14,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 999,
-    backgroundColor: palette.ivory,
-    borderWidth: 1,
-    borderColor: palette.border,
-  },
-
-  monthChipActive: {
-    backgroundColor: palette.emerald900,
-    borderColor: palette.emerald900,
-  },
-
-  monthChipText: {
-    color: palette.emerald900,
-    fontSize: 13,
-    fontWeight: "900",
-  },
-
-  monthChipTextActive: {
-    color: palette.ivory,
   },
 
   emptyMonthBox: {

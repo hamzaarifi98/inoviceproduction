@@ -1,4 +1,4 @@
-# Invoice Pocket Mobile
+# AI Fiskalna Mobile
 
 React Native/Expo mobile frontend for Android camera upload.
 
