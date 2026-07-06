@@ -6,7 +6,7 @@ import { CategoryRow } from "../components/CategoryRow";
 import { styles } from "../styles/styles";
 import { money } from "../utils/currency";
 import { detectCategory, summarizeCategories } from "../utils/categories";
-import { getInvoiceAmount, getInvoiceCurrency, getTotalSpent } from "../utils/invoices";
+import { getInvoiceAmount, getInvoiceCurrency, getItemAmount, getTotalSpent } from "../utils/invoices";
 
 export function CategoriesScreen({ invoices, t }) {
   const [selectedCategoryId, setSelectedCategoryId] = useState(null);
@@ -92,7 +92,7 @@ function getCategoryDetails(records, categoryId) {
           invoiceId: record.invoice_file_id,
           name: item.item_name || "Item",
           supplier: invoice.supplier_name || record.original_filename || "Invoice",
-          amount: Number(String(item.total_price || 0).replace(/[^0-9.-]/g, "")) || 0,
+          amount: getItemAmount(item),
           currency: getInvoiceCurrency(record),
         });
       }

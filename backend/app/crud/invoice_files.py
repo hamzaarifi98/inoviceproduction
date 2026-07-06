@@ -54,6 +54,13 @@ def get_invoice_file_for_user(
     )
 
 
+def delete_invoice_file(
+    db: Session,
+    invoice_file: InvoiceFile,
+) -> None:
+    db.delete(invoice_file)
+
+
 def count_invoice_files_for_user(
     db: Session,
     user_id: int,

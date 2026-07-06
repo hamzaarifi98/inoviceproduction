@@ -3,13 +3,30 @@ import { Pressable, Text, View } from "react-native";
 import { languages } from "../i18n";
 import { styles } from "../styles/styles";
 
-export function Header({ title, user, language, updateLanguage, onLogout, t }) {
+export function Header({
+  title,
+  user,
+  language,
+  updateLanguage,
+  onOpenSettings,
+  isSettingsOpen,
+  t,
+}) {
   const isGuest = user?.is_guest;
+  const displayName = isGuest ? t("guestUser") : user?.email || t("guestUser");
+  const initial = (displayName.trim()[0] || "?").toUpperCase();
 
   return (
     <View style={styles.header}>
       <View style={styles.headerText}>
-        <Text style={styles.userEmail}>{isGuest ? t("guestUser") : user?.email}</Text>
+        <View style={styles.userChip}>
+          <View style={styles.userAvatar}>
+            <Text style={styles.userAvatarText}>{initial}</Text>
+          </View>
+          <Text style={styles.userEmail} numberOfLines={1} ellipsizeMode="tail">
+            {displayName}
+          </Text>
+        </View>
         <Text style={styles.title}>{title}</Text>
       </View>
       <View style={styles.headerActions}>
@@ -26,11 +43,23 @@ export function Header({ title, user, language, updateLanguage, onLogout, t }) {
             </Pressable>
           ))}
         </View>
-        {!isGuest && user?.email && (
-          <Pressable onPress={onLogout} style={styles.logoutButton}>
-            <Text style={styles.logoutText}>{t("logout")}</Text>
-          </Pressable>
-        )}
+        <Pressable
+          onPress={onOpenSettings}
+          accessibilityLabel={t("settings")}
+          style={[
+            styles.settingsButton,
+            isSettingsOpen && styles.settingsButtonActive,
+          ]}
+        >
+          <Text
+            style={[
+              styles.settingsIcon,
+              isSettingsOpen && styles.settingsIconActive,
+            ]}
+          >
+            ⚙
+          </Text>
+        </Pressable>
       </View>
     </View>
   );

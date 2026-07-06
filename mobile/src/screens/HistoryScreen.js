@@ -101,11 +101,15 @@ export function HistoryScreen({ app, t }) {
         {
           text: t("delete"),
           style: "destructive",
-          onPress: () => {
-            app.deleteInvoice(record.invoice_file_id);
+          onPress: async () => {
+            try {
+              await app.deleteInvoice(record.invoice_file_id, { source: record.source });
 
-            if (openInvoiceId === record.invoice_file_id) {
-              setOpenInvoiceId(null);
+              if (openInvoiceId === record.invoice_file_id) {
+                setOpenInvoiceId(null);
+              }
+            } catch (caught) {
+              Alert.alert(t("deleteInvoice"), caught.message);
             }
           },
         },

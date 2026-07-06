@@ -2,7 +2,7 @@ import { Pressable, Text, View } from "react-native";
 
 import { styles } from "../styles/styles";
 import { money } from "../utils/currency";
-import { formatItemMeta, getInvoiceAmount, getInvoiceCurrency } from "../utils/invoices";
+import { formatItemMeta, getInvoiceAmount, getInvoiceCurrency, getItemAmount } from "../utils/invoices";
 import { EmptyState, PrimaryButton } from "./Card";
 
 export function InvoiceSummary({ record, t }) {
@@ -49,7 +49,7 @@ export function ExpandableInvoice({ record, isOpen, onToggle, onRetry, onDelete,
                 <Text style={styles.itemName}>{item.item_name || t("item")}</Text>
                 <Text style={styles.invoiceMeta}>{formatItemMeta(item)}</Text>
               </View>
-              <Text style={styles.itemPrice}>{money(item.total_price, getInvoiceCurrency(record))}</Text>
+              <Text style={styles.itemPrice}>{money(getItemAmount(item), getInvoiceCurrency(record))}</Text>
             </View>
           )) : <EmptyState title={t("noItems")} copy={t("noItemsCopy")} />}
         </View>

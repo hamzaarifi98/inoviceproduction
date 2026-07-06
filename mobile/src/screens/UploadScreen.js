@@ -11,21 +11,23 @@ import { styles } from "../styles/styles";
 import { detectCategory } from "../utils/categories";
 import { getInvoiceAmount } from "../utils/invoices";
 
-export function UploadScreen({ app, t, onRequireAccount }) {
+export function UploadScreen({ app, t, onManagePro }) {
   const [selectedFile, setSelectedFile] = useState(null);
   const [status, setStatus] = useState(t("initialStatus"));
   const [isUploading, setIsUploading] = useState(false);
   const [mode, setMode] = useState("scan");
   const isPro = Boolean(app.scanUsage?.is_pro || app.session.user?.is_pro);
+  const isGuest = Boolean(app.session.user?.is_guest);
   const usedScans = app.scanUsage?.used_scans ?? app.invoices.length;
   const freeScanLimit = app.scanUsage?.free_scan_limit ?? FREE_SCAN_LIMIT;
   const freeScansLeft = app.scanUsage?.remaining_free_scans ?? Math.max(freeScanLimit - usedScans, 0);
   const needsPro = !isPro && usedScans >= freeScanLimit;
+  const proRequiredMessage = isGuest ? t("proRequiredGuest") : t("proRequired");
 
   async function takePhoto() {
     if (needsPro) {
-      setStatus(t("proRequired"));
-      onRequireAccount?.();
+      setStatus(proRequiredMessage);
+      onManagePro?.();
       return;
     }
 
@@ -48,8 +50,8 @@ export function UploadScreen({ app, t, onRequireAccount }) {
 
   async function chooseImage() {
     if (needsPro) {
-      setStatus(t("proRequired"));
-      onRequireAccount?.();
+      setStatus(proRequiredMessage);
+      onManagePro?.();
       return;
     }
 
@@ -65,8 +67,8 @@ export function UploadScreen({ app, t, onRequireAccount }) {
 
   async function choosePdf() {
     if (needsPro) {
-      setStatus(t("proRequired"));
-      onRequireAccount?.();
+      setStatus(proRequiredMessage);
+      onManagePro?.();
       return;
     }
 
@@ -97,8 +99,8 @@ export function UploadScreen({ app, t, onRequireAccount }) {
 
   async function uploadSelectedFile() {
     if (needsPro) {
-      setStatus(t("proRequired"));
-      onRequireAccount?.();
+      setStatus(proRequiredMessage);
+      onManagePro?.();
       return;
     }
 
@@ -227,9 +229,9 @@ export function UploadScreen({ app, t, onRequireAccount }) {
         {!isPro && (
           <>
             <Text style={[styles.statusText, needsPro && styles.errorText]}>
-              {needsPro ? t("proRequired") : t("scansLeft", { count: freeScansLeft })}
+              {needsPro ? proRequiredMessage : t("scansLeft", { count: freeScansLeft })}
             </Text>
-            <PrimaryButton title={t("upgrade")} onPress={onRequireAccount} />
+            <PrimaryButton title={isGuest ? t("upgrade") : t("subscribeProPrice")} onPress={onManagePro} />
           </>
         )}
       </Card>
@@ -273,7 +275,7 @@ export function UploadScreen({ app, t, onRequireAccount }) {
             </View>
 
             <PrimaryButton title={t("uploadInvoice")} busy={isUploading} disabled={needsPro} onPress={uploadSelectedFile} />
-            <Text style={[styles.statusText, (status === t("chooseInvoice") || status === t("proRequired")) && styles.errorText]}>
+            <Text style={[styles.statusText, (status === t("chooseInvoice") || status === proRequiredMessage) && styles.errorText]}>
               {status}
             </Text>
           </>

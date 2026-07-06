@@ -91,10 +91,60 @@ export function useInvoiceApp() {
   }, []);
 
   const activatePro = useCallback(async () => {
+    const activeSession = sessionRef.current;
+    if (!activeSession.token || activeSession.user?.is_guest) {
+      throw new Error("Log in before subscribing to Pro.");
+    }
+
+    const { response, payload } = await sendApiRequest(
+      `${apiUrl}/auth/subscribe-pro`,
+      {
+        method: "POST",
+        body: JSON.stringify({ plan: "pro_monthly_299" }),
+      },
+      {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${activeSession.token}`,
+      },
+      45000,
+      "Subscription took too long. Please try again.",
+      apiUrl,
+    );
+
+    if (!response.ok) {
+      throw createApiError(response, payload, "Could not activate Pro subscription");
+    }
+
+    const nextSession = normalizeSession({
+      token: payload.access_token || activeSession.token,
+      user: payload.user || {
+        ...activeSession.user,
+        is_pro: true,
+      },
+    });
     const nextSubscription = { plan: "pro", activatedAt: new Date().toISOString() };
+
+    updateSessionState(nextSession);
     setSubscription(nextSubscription);
-    await writeJson(SUBSCRIPTION_KEY, nextSubscription);
-  }, []);
+    setScanUsage((current) => {
+      const nextUsage = normalizeScanUsage(
+        {
+          ...current,
+          is_pro: true,
+        },
+        countInvoiceScans(invoices),
+      );
+      persistScanUsage(nextSession.user, nextUsage);
+      return nextUsage;
+    });
+
+    await Promise.all([
+      writeJson(SUBSCRIPTION_KEY, nextSubscription),
+      writeJson(SESSION_KEY, nextSession),
+    ]);
+
+    return nextSubscription;
+  }, [apiUrl, invoices]);
 
   const logout = useCallback(async () => {
     const guestInvoices = await loadInvoicesForUser(null);
@@ -271,13 +321,19 @@ export function useInvoiceApp() {
     });
   }, [session.user]);
 
-  const deleteInvoice = useCallback((invoiceFileId) => {
+  const deleteInvoice = useCallback(async (invoiceFileId, options = {}) => {
+    const isManualOnly = options.source === "manual" || String(invoiceFileId).startsWith("manual-");
+
+    if (!isManualOnly) {
+      await request(`/invoices/files/${invoiceFileId}`, { method: "DELETE" });
+    }
+
     setInvoices((current) => {
       const nextInvoices = current.filter((invoice) => invoice.invoice_file_id !== invoiceFileId);
       persistInvoices(session.user, nextInvoices);
       return nextInvoices;
     });
-  }, [session.user]);
+  }, [request, session.user]);
 
   return useMemo(
     () => ({

@@ -1,5 +1,4 @@
-import { parseMoney } from "./currency";
-import { getInvoiceAmount } from "./invoices";
+import { getInvoiceAmount, getItemAmount } from "./invoices";
 
 export const categories = [
   { id: "food", label: "Food", color: "#24a47a", match: ["food", "market", "restaurant", "cafe", "pizza", "burger", "bread"] },
@@ -46,7 +45,7 @@ export function summarizeCategories(invoices) {
 
     items.forEach((item) => {
       const summary = totals.get(normalizeCategoryId(item.category)) || totals.get("other");
-      summary.amount += parseMoney(item.total_price);
+      summary.amount += getItemAmount(item);
       summary.count += 1;
     });
   });

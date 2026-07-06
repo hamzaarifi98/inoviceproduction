@@ -88,6 +88,10 @@ class ResetPasswordRequest(BaseModel):
         return pin
 
 
+class SubscribeProRequest(BaseModel):
+    plan: str = Field("pro_monthly_299", min_length=1, max_length=64)
+
+
 class UserResponse(BaseModel):
     id: str
     email: str

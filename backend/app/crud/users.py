@@ -79,3 +79,7 @@ def mark_email_verified(user: User) -> None:
     user.is_email_verified = True
     user.email_verification_pin_hash = None
     user.email_verification_expires_at = None
+
+
+def mark_user_pro(user: User) -> None:
+    user.is_pro = True

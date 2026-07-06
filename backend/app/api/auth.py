@@ -20,6 +20,7 @@ from app.crud.users import (
     create_user,
     get_user_by_email,
     mark_email_verified,
+    mark_user_pro,
     set_password_hash,
     set_password_reset_pin,
     set_email_verification_pin,
@@ -34,6 +35,7 @@ from app.schemas.auth import (
     RegisterResponse,
     ResendVerificationRequest,
     ResetPasswordRequest,
+    SubscribeProRequest,
     TokenResponse,
     UserResponse,
     VerifyEmailRequest,
@@ -338,6 +340,42 @@ def login(
         password=request.password,
     )
     return _token_response(user)
+
+
+@router.post(
+    "/subscribe-pro",
+    response_model=TokenResponse,
+)
+def subscribe_pro(
+    http_request: Request,
+    subscription: SubscribeProRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    enforce_rate_limit(
+        http_request,
+        "subscribe-pro",
+        str(current_user.public_id),
+        max_attempts=8,
+    )
+
+    if current_user.is_guest:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Log in before subscribing to Pro",
+        )
+
+    if subscription.plan != "pro_monthly_299":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Unsupported subscription plan",
+        )
+
+    mark_user_pro(current_user)
+    db.commit()
+    db.refresh(current_user)
+
+    return _token_response(current_user)
 
 
 @router.post(

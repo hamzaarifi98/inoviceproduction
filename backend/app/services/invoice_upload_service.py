@@ -11,6 +11,7 @@ from app.crud.invoices import get_invoice_by_file_id
 from app.crud.invoice_files import (
     count_invoice_files_for_user,
     create_invoice_file,
+    delete_invoice_file,
     get_invoice_file,
     get_invoice_file_for_user,
     list_invoice_files_for_user,
@@ -503,6 +504,34 @@ def retry_invoice_processing(
     }
 
 
+def delete_invoice_upload(
+    db: Session,
+    user_id: int,
+    invoice_file_id: str,
+) -> dict:
+    invoice_uuid = _parse_invoice_uuid(invoice_file_id)
+
+    invoice_file = get_invoice_file_for_user(
+        db=db,
+        invoice_file_id=invoice_uuid,
+        user_id=user_id,
+    )
+
+    if invoice_file is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Invoice file not found",
+        )
+
+    delete_invoice_file(db=db, invoice_file=invoice_file)
+    db.commit()
+
+    return {
+        "message": "Invoice deleted.",
+        "invoice_file_id": invoice_file_id,
+    }
+
+
 def _parse_invoice_uuid(invoice_file_id: str) -> UUID:
     try:
         return UUID(invoice_file_id)
@@ -524,7 +553,7 @@ def _enforce_scan_access(
     if scan_count >= FREE_SCAN_LIMIT:
         raise HTTPException(
             status_code=403,
-            detail="Free scan limit reached. Register, subscribe to Pro, and log in to continue.",
+            detail="Free scan limit reached. Subscribe to Pro for 2.99/month to continue.",
         )
 
 

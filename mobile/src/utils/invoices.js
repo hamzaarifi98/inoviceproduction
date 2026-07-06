@@ -2,7 +2,35 @@ import { DEFAULT_CURRENCY } from "../constants";
 import { parseMoney } from "./currency";
 
 export function getInvoiceAmount(record) {
-  return parseMoney(record.invoice?.total_amount ?? record.amount ?? 0);
+  const explicitAmount = parseMoney(record.invoice?.total_amount ?? record.amount ?? 0);
+
+  if (explicitAmount > 0) {
+    return explicitAmount;
+  }
+
+  const itemsTotal = getInvoiceItemsTotal(record.invoice?.items || []);
+  return itemsTotal > 0 ? itemsTotal : explicitAmount;
+}
+
+export function getInvoiceItemsTotal(items) {
+  return items.reduce((sum, item) => sum + getItemAmount(item), 0);
+}
+
+export function getItemAmount(item) {
+  const explicitTotal = parseMoney(item?.total_price ?? item?.line_total ?? 0);
+
+  if (explicitTotal > 0) {
+    return explicitTotal;
+  }
+
+  const unitPrice = parseMoney(item?.unit_price ?? 0);
+  const quantity = parseMoney(item?.quantity ?? 0);
+
+  if (unitPrice > 0) {
+    return unitPrice * (quantity > 0 ? quantity : 1);
+  }
+
+  return 0;
 }
 
 export function getInvoiceCurrency(record) {

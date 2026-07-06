@@ -148,11 +148,43 @@ export const styles = StyleSheet.create({
     minWidth: 0,
   },
 
+  userChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    maxWidth: "100%",
+    gap: 8,
+    marginBottom: 10,
+    paddingVertical: 5,
+    paddingRight: 12,
+    paddingLeft: 5,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "rgba(248, 231, 184, 0.35)",
+    backgroundColor: "rgba(255, 250, 240, 0.1)",
+  },
+
+  userAvatar: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: palette.gold,
+  },
+
+  userAvatarText: {
+    color: palette.emerald900,
+    fontSize: 11,
+    fontWeight: "900",
+  },
+
   userEmail: {
-    marginBottom: 6,
+    flexShrink: 1,
     color: palette.white,
-    fontSize: 14,
-    opacity: 0.9,
+    fontSize: 13,
+    fontWeight: "600",
+    opacity: 0.92,
   },
 
   title: {
@@ -198,27 +230,29 @@ export const styles = StyleSheet.create({
     color: palette.emerald900,
   },
 
-  logoutButton: {
-    minWidth: 72,
-    minHeight: 46,
+  settingsButton: {
+    width: 46,
+    height: 46,
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 14,
     borderWidth: 1,
     borderColor: "rgba(248, 231, 184, 0.65)",
     borderRadius: 8,
-    backgroundColor: palette.ivory,
-    shadowColor: palette.emerald900,
-    shadowOpacity: 0.18,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 5 },
-    elevation: 3,
+    backgroundColor: "rgba(255, 250, 240, 0.12)",
   },
 
-  logoutText: {
-    color: palette.emerald800,
-    fontSize: 15,
+  settingsButtonActive: {
+    backgroundColor: palette.ivory,
+  },
+
+  settingsIcon: {
+    color: palette.white,
+    fontSize: 22,
     fontWeight: "900",
+  },
+
+  settingsIconActive: {
+    color: palette.emerald900,
   },
 
   content: {
@@ -527,6 +561,268 @@ export const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "900",
     overflow: "hidden",
+  },
+
+  // SETTINGS
+
+  settingsHero: {
+    gap: 18,
+    padding: 22,
+    borderRadius: 8,
+    backgroundColor: palette.emerald900,
+    shadowColor: palette.emerald900,
+    shadowOpacity: 0.18,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 5,
+  },
+
+  settingsHeroTop: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+
+  settingsHeroText: {
+    flex: 1,
+    minWidth: 0,
+    gap: 8,
+  },
+
+  settingsHeroTitle: {
+    color: palette.ivory,
+    fontSize: 30,
+    fontWeight: "900",
+    letterSpacing: 0,
+  },
+
+  settingsHeroCopy: {
+    color: "rgba(255, 247, 232, 0.82)",
+    fontSize: 15,
+    lineHeight: 22,
+  },
+
+  settingsPlanBadge: {
+    maxWidth: 118,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    overflow: "hidden",
+    borderRadius: 8,
+    backgroundColor: palette.ivory,
+    color: palette.emerald900,
+    fontSize: 12,
+    fontWeight: "900",
+    textAlign: "center",
+  },
+
+  settingsPlanBadgePro: {
+    backgroundColor: palette.goldSoft,
+  },
+
+  settingsMetricGrid: {
+    flexDirection: "row",
+    gap: 10,
+  },
+
+  settingsMetric: {
+    flex: 1,
+    gap: 6,
+    minWidth: 0,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: "rgba(255, 247, 232, 0.22)",
+    borderRadius: 8,
+    backgroundColor: "rgba(255, 247, 232, 0.1)",
+  },
+
+  settingsMetricLabel: {
+    color: "rgba(255, 247, 232, 0.72)",
+    fontSize: 12,
+    fontWeight: "800",
+  },
+
+  settingsMetricValue: {
+    color: palette.ivory,
+    fontSize: 18,
+    fontWeight: "900",
+  },
+
+  settingsSectionHeader: {
+    gap: 6,
+  },
+
+  settingsRow: {
+    minHeight: 48,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 14,
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderTopColor: palette.borderSoft,
+  },
+
+  settingsLabel: {
+    flex: 1,
+    minWidth: 0,
+    color: palette.slate,
+    fontSize: 14,
+    fontWeight: "800",
+  },
+
+  settingsValue: {
+    flex: 1.2,
+    minWidth: 0,
+    color: palette.ink,
+    fontSize: 15,
+    fontWeight: "900",
+    textAlign: "right",
+  },
+
+  billingCard: {
+    borderColor: palette.gold,
+    backgroundColor: palette.ivory,
+  },
+
+  priceRow: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    gap: 8,
+  },
+
+  priceAmount: {
+    color: palette.emerald900,
+    fontSize: 44,
+    fontWeight: "900",
+    letterSpacing: 0,
+  },
+
+  pricePeriod: {
+    marginBottom: 8,
+    color: palette.slate,
+    fontSize: 16,
+    fontWeight: "800",
+  },
+
+  featureRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+
+  featureCheck: {
+    width: 26,
+    height: 26,
+    borderRadius: 8,
+    overflow: "hidden",
+    textAlign: "center",
+    textAlignVertical: "center",
+    color: palette.emerald900,
+    backgroundColor: palette.goldSoft,
+    fontSize: 14,
+    fontWeight: "900",
+  },
+
+  featureText: {
+    flex: 1,
+    minWidth: 0,
+    color: palette.ink,
+    fontSize: 15,
+    fontWeight: "800",
+  },
+
+  settingsMessage: {
+    color: palette.emerald800,
+    fontSize: 15,
+    fontWeight: "800",
+  },
+
+  settingsLanguageSwitch: {
+    flexDirection: "row",
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: palette.border,
+    borderRadius: 8,
+    backgroundColor: palette.ivory,
+  },
+
+  settingsLanguageButton: {
+    flex: 1,
+    minHeight: 48,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 8,
+  },
+
+  settingsLanguageButtonActive: {
+    backgroundColor: palette.emerald900,
+  },
+
+  settingsLanguageText: {
+    color: palette.emerald900,
+    fontSize: 13,
+    fontWeight: "900",
+  },
+
+  settingsLanguageTextActive: {
+    color: palette.white,
+  },
+
+  settingsOverlay: {
+    position: "absolute",
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    flexDirection: "row",
+    zIndex: 20,
+    elevation: 20,
+  },
+
+  settingsBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(6, 59, 58, 0.55)",
+  },
+
+  settingsBackdropPress: {
+    flex: 1,
+  },
+
+  settingsPanel: {
+    height: "100%",
+    backgroundColor: palette.mintWash,
+    paddingTop: 20 + topInset,
+    shadowColor: palette.emerald900,
+    shadowOpacity: 0.3,
+    shadowRadius: 24,
+    shadowOffset: { width: 8, height: 0 },
+    elevation: 24,
+  },
+
+  settingsPanelContent: {
+    gap: 18,
+    paddingHorizontal: 18,
+    paddingTop: 4,
+    paddingBottom: 24,
+  },
+
+  settingsLogoutButton: {
+    minHeight: 52,
+    alignItems: "center",
+    justifyContent: "center",
+    marginHorizontal: 18,
+    marginBottom: 18 + bottomInset,
+    borderWidth: 1,
+    borderColor: palette.coral,
+    borderRadius: 8,
+    backgroundColor: palette.coralSoft,
+  },
+
+  settingsLogoutText: {
+    color: palette.coralDark,
+    fontSize: 15,
+    fontWeight: "900",
   },
 
   // FORMS / BUTTONS

@@ -12,7 +12,7 @@ import {
   getTotalSpent,
 } from "../utils/invoices";
 
-export function DashboardScreen({ app, t }) {
+export function DashboardScreen({ app, t, onOpenSettings }) {
   const processed = app.invoices.filter((record) => record.invoice);
   const recent = app.invoices.slice(0, 3);
 
@@ -73,9 +73,16 @@ export function DashboardScreen({ app, t }) {
             <Text style={styles.monthlySubtitle}>{t("monthlyBudgetCopy")}</Text>
           </View>
 
-          <View style={styles.monthlyIconBubble}>
+          <Pressable
+            onPress={onOpenSettings}
+            accessibilityLabel={t("settings")}
+            style={({ pressed }) => [
+              styles.monthlyIconBubble,
+              pressed && styles.pressed,
+            ]}
+          >
             <Text style={styles.monthlyIconText}>↗</Text>
-          </View>
+          </Pressable>
         </View>
 
         <View style={styles.monthlyCompareRow}>

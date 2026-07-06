@@ -31,6 +31,7 @@ from app.services.invoice_upload_service import (
     get_invoice_processing_logs,
     get_invoice_usage,
     retry_invoice_processing,
+    delete_invoice_upload,
 )
 from app.services.invoice_file_rules import get_invoice_content_type
 from app.services.invoice_processor import build_invoice_payload
@@ -251,6 +252,22 @@ def retry_upload_processing(
         user_id=current_user.id,
         invoice_file_id=invoice_file_id,
     )
+
+@router.delete(
+    "/files/{invoice_file_id}",
+    status_code=status.HTTP_200_OK,
+)
+def delete_upload(
+    invoice_file_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return delete_invoice_upload(
+        db=db,
+        user_id=current_user.id,
+        invoice_file_id=invoice_file_id,
+    )
+
 
 @router.delete(
     "/admin/all-data",
