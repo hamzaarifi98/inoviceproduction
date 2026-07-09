@@ -11,3 +11,5 @@ data/raw/
 data/uploaded/
 outputs/
 *.log
+test/
+.git/
