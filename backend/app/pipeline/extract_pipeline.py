@@ -1,4 +1,3 @@
-from pathlib import Path
 
 from app.core.config import DATA_DIR
 from app.services.google_ocr import GoogleOCRService

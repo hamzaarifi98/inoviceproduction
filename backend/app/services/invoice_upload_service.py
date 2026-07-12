@@ -12,7 +12,6 @@ from app.crud.invoice_files import (
     count_invoice_files_for_user,
     create_invoice_file,
     delete_invoice_file,
-    get_invoice_file,
     get_invoice_file_for_user,
     list_invoice_files_for_user,
     mark_invoice_uploaded,

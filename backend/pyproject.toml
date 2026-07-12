@@ -1,0 +1,7 @@
+[tool.ruff.lint]
+ignore = ["E402"]  # alembic migrations and dotenv-load-before-import patterns need this
+
+[tool.ruff.lint.per-file-ignores]
+"app/models/__init__.py" = ["F401"]      # intentional re-exports
+"app/models/invoice_item.py" = ["F821"]  # SQLAlchemy string-based forward ref, resolved at runtime
+"alembic/env.py" = ["F401"]              # models imported for their side effect (metadata registration)
