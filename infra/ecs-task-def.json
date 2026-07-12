@@ -4,12 +4,12 @@
   "requiresCompatibilities": ["FARGATE"],
   "cpu": "512",
   "memory": "1024",
-  "executionRoleArn": "arn:aws:iam::<ACCOUNT_ID>:role/invoiceapp-ecs-execution-role",
-  "taskRoleArn": "arn:aws:iam::<ACCOUNT_ID>:role/invoiceapp-ecs-task-role",
+  "executionRoleArn": "arn:aws:iam::216016752546:role/invoiceapp-ecs-execution-role",
+  "taskRoleArn": "arn:aws:iam::216016752546:role/invoiceapp-ecs-task-role",
   "containerDefinitions": [
     {
       "name": "backend",
-      "image": "<ACCOUNT_ID>.dkr.ecr.eu-north-1.amazonaws.com/invoiceapp-backend:placeholder",
+      "image": "216016752546.dkr.ecr.eu-north-1.amazonaws.com/invoiceapp-backend:placeholder",
       "portMappings": [
         { "containerPort": 8000, "protocol": "tcp" }
       ],
@@ -19,19 +19,20 @@
         { "name": "S3_BUCKET_NAME", "value": "amzn-invoiceapp" },
         { "name": "RUN_MIGRATIONS", "value": "true" }
       ],
-      "secrets": [
-        { "name": "DATABASE_URL", "valueFrom": "arn:aws:secretsmanager:eu-north-1:<ACCOUNT_ID>:secret:invoiceapp/DATABASE_URL" },
-        { "name": "OPENAI_API_KEY", "valueFrom": "arn:aws:secretsmanager:eu-north-1:<ACCOUNT_ID>:secret:invoiceapp/OPENAI_API_KEY" },
-        { "name": "OPENAI_MODEL", "valueFrom": "arn:aws:secretsmanager:eu-north-1:<ACCOUNT_ID>:secret:invoiceapp/OPENAI_MODEL" },
-        { "name": "OPENAI_FALLBACK_MODEL", "valueFrom": "arn:aws:secretsmanager:eu-north-1:<ACCOUNT_ID>:secret:invoiceapp/OPENAI_FALLBACK_MODEL" },
-        { "name": "GOOGLE_CREDENTIALS_JSON", "valueFrom": "arn:aws:secretsmanager:eu-north-1:<ACCOUNT_ID>:secret:invoiceapp/GOOGLE_CREDENTIALS_JSON" },
-        { "name": "SMTP_HOST", "valueFrom": "arn:aws:secretsmanager:eu-north-1:<ACCOUNT_ID>:secret:invoiceapp/SMTP_HOST" },
-        { "name": "SMTP_PORT", "valueFrom": "arn:aws:secretsmanager:eu-north-1:<ACCOUNT_ID>:secret:invoiceapp/SMTP_PORT" },
-        { "name": "SMTP_USERNAME", "valueFrom": "arn:aws:secretsmanager:eu-north-1:<ACCOUNT_ID>:secret:invoiceapp/SMTP_USERNAME" },
-        { "name": "SMTP_PASSWORD", "valueFrom": "arn:aws:secretsmanager:eu-north-1:<ACCOUNT_ID>:secret:invoiceapp/SMTP_PASSWORD" },
-        { "name": "SMTP_FROM_EMAIL", "valueFrom": "arn:aws:secretsmanager:eu-north-1:<ACCOUNT_ID>:secret:invoiceapp/SMTP_FROM_EMAIL" },
-        { "name": "ADMIN_EMAIL", "valueFrom": "arn:aws:secretsmanager:eu-north-1:<ACCOUNT_ID>:secret:invoiceapp/ADMIN_EMAIL" }
+            "secrets": [
+        { "name": "DATABASE_URL", "valueFrom": "arn:aws:secretsmanager:eu-north-1:216016752546:secret:invoiceapp/DATABASE_URL" },
+        { "name": "OPENAI_API_KEY", "valueFrom": "arn:aws:secretsmanager:eu-north-1:216016752546:secret:invoiceapp/OPENAI_API_KEY" },
+        { "name": "OPENAI_MODEL", "valueFrom": "arn:aws:secretsmanager:eu-north-1:216016752546:secret:invoiceapp/OPENAI_MODEL" },
+        { "name": "OPENAI_FALLBACK_MODEL", "valueFrom": "arn:aws:secretsmanager:eu-north-1:216016752546:secret:invoiceapp/OPENAI_FALLBACK_MODEL" },
+        { "name": "GOOGLE_CREDENTIALS_JSON", "valueFrom": "arn:aws:secretsmanager:eu-north-1:216016752546:secret:invoiceapp/GOOGLE_CREDENTIALS_JSON" },
+        { "name": "SMTP_HOST", "valueFrom": "arn:aws:secretsmanager:eu-north-1:216016752546:secret:invoiceapp/SMTP_HOST" },
+        { "name": "SMTP_PORT", "valueFrom": "arn:aws:secretsmanager:eu-north-1:216016752546:secret:invoiceapp/SMTP_PORT" },
+        { "name": "SMTP_USERNAME", "valueFrom": "arn:aws:secretsmanager:eu-north-1:216016752546:secret:invoiceapp/SMTP_USERNAME" },
+        { "name": "SMTP_PASSWORD", "valueFrom": "arn:aws:secretsmanager:eu-north-1:216016752546:secret:invoiceapp/SMTP_PASSWORD" },
+        { "name": "SMTP_FROM_EMAIL", "valueFrom": "arn:aws:secretsmanager:eu-north-1:216016752546:secret:invoiceapp/SMTP_FROM_EMAIL" },
+        { "name": "ADMIN_EMAIL", "valueFrom": "arn:aws:secretsmanager:eu-north-1:216016752546:secret:invoiceapp/ADMIN_EMAIL" }
       ],
+
       "logConfiguration": {
         "logDriver": "awslogs",
         "options": {

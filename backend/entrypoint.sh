@@ -1,6 +1,12 @@
 #!/bin/sh
 set -e
 
+if [ -n "${GOOGLE_CREDENTIALS_JSON:-}" ]; then
+    echo "$GOOGLE_CREDENTIALS_JSON" > /tmp/gcp-credentials.json
+    export GOOGLE_APPLICATION_CREDENTIALS=/tmp/gcp-credentials.json
+fi
+
+
 if [ "${RUN_MIGRATIONS:-true}" = "true" ]; then
     echo "Running alembic migrations..."
     alembic upgrade head
